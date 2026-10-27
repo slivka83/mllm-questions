@@ -103,12 +103,11 @@ html[data-theme=dark] .chip.donec{background:#12301f;border-color:#235c3a;color:
 .dnav:hover{border-color:var(--accent)}
 .dtopbar .dnav+.dnav{margin-left:0}
 .back:hover{text-decoration:underline}
+.dtopbar .dhide{height:30px;padding:0 10px;border-radius:9px;border:1px solid var(--border);background:var(--panel2);
+  color:var(--text);cursor:pointer;font-size:12.5px;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.dtopbar .dhide:hover{border-color:var(--accent)}
 .detail{padding:18px 22px;box-shadow:var(--shadow);margin-bottom:12px}
 .dq{font-size:19px;line-height:1.45;margin:10px 0 14px}
-.dact{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
-.dact button{height:32px;padding:0 12px;border-radius:9px;border:1px solid var(--border);background:var(--panel2);
-  color:var(--text);cursor:pointer;font-size:13px}
-.dact button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
 .ans{margin-top:16px;padding-top:14px;border-top:1px solid var(--border)}
 .ans h3{margin:0 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
 .ansbody code{background:var(--panel2);border:1px solid var(--border);border-radius:5px;padding:1px 5px;font-size:12.5px}
@@ -159,12 +158,12 @@ kbd{font-family:inherit;font-size:11px;border:1px solid var(--border);border-bot
   .cq{font-size:16px}
   .dq{font-size:18px}
   .detail{padding:14px 16px}
-  .dact button{height:38px}
   .train-card{padding:16px 14px}
   .tq{font-size:18px}
   .tactions button{height:44px;flex:1 1 auto;font-size:15px}
   .dtopbar{gap:6px;flex-wrap:nowrap}
   .dtopbar .back{font-size:13px}
+  .dtopbar .dhide{height:32px;font-size:11.5px;padding:0 8px}
   .dtopbar .pcount{font-size:11.5px;white-space:nowrap}
   .dnav{max-width:30%;font-size:11.5px;padding:9px 10px}
   .ansbody{overflow-wrap:break-word}
@@ -571,6 +570,7 @@ function renderDetail(){
   var src = SRC[it.src];
   var html = '<div class="dtopbar">'
       + '<button class="back" data-act="back">← к списку</button>'
+      + '<button class="dhide" data-act="hide" data-id="'+it.id+'" title="'+(state.hiddenOnly?'Вернуть в списки':'Скрыть вопрос')+'">'+(state.hiddenOnly?'👁 вернуть в списки':'🙈 скрыть')+'</button>'
       + '<span class="pcount">'+(idx+1)+' из '+state.filtered.length+'</span>'
       + (prev ? '<button class="dnav" data-act="open" data-id="'+prev.id+'" title="'+esc(prev.q)+'">← '+esc(cut(prev.q,44))+'</button>' : '<span class="dnav-sp"></span>')
       + (next ? '<button class="dnav" data-act="open" data-id="'+next.id+'" title="'+esc(next.q)+'">'+esc(cut(next.q,44))+' →</button>' : '<span class="dnav-sp"></span>')
@@ -583,9 +583,6 @@ function renderDetail(){
       + (it.icon?'<span>'+it.icon+'</span>':'')
       + '</div>'
       + '<h2 class="dq">'+esc(it.q)+'</h2>'
-      + '<div class="dact">'
-      + '<button data-act="hide" data-id="'+it.id+'">'+(state.hiddenOnly?'👁 вернуть в списки':'🙈 скрыть')+'</button>'
-      + '</div>'
       + (it.short ? '<section class="ans"><h3>Краткий ответ</h3><div class="ansbody">'+md(it.short)+'</div></section>' : '')
       + '<section class="ans"><h3>'+(it.short?'Развернутый ответ':'Ответ')+'</h3><div class="ansbody">'+md(it.long || '—')+'</div></section>'
       + '</article>';
