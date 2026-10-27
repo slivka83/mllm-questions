@@ -580,8 +580,6 @@ function renderDetail(){
       + '</div>'
       + '<h2 class="dq">'+esc(it.q)+'</h2>'
       + '<div class="dact">'
-      + '<button data-act="fav" data-id="'+it.id+'"'+(favs[it.id]?' class="on"':'')+'>'+(favs[it.id]?'★':'+')+' в избранное</button>'
-      + '<button data-act="done" data-id="'+it.id+'"'+(done[it.id]?' class="on"':'')+'>'+(done[it.id]?'✓':'-')+' изучено</button>'
       + '<button data-act="hide" data-id="'+it.id+'">'+(state.hiddenOnly?'👁 вернуть в списки':'🙈 скрыть')+'</button>'
       + '</div>'
       + (it.short ? '<section class="ans"><h3>Краткий ответ</h3><div class="ansbody">'+md(it.short)+'</div></section>' : '')
