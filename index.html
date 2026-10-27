@@ -193,7 +193,6 @@ kbd{font-family:inherit;font-size:11px;border:1px solid var(--border);border-bot
   <div class="modes">
     <button id="mode-list" class="on" title="Чтение">📖 <span>Чтение</span></button>
     <button id="mode-train" title="Тренировка">🎯 <span>Тренировка</span></button>
-    <button id="mode-learn" title="Учёба">🧠 <span>Учёба</span></button>
     <button id="theme" title="Светлая/тёмная тема">🌓</button>
   </div>
 </header>
@@ -237,7 +236,7 @@ var state = {
   favOnly: false, undoneOnly: false, hiddenOnly: false,
   filtered: [], cur: null, from: 'list'
 };
-var train = { list: [], i: 0, shuffled: false, countedId: null };
+var train = { list: [] };
 
 /* ----------------------------- markdown ----------------------------- */
 function escMd(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -530,7 +529,7 @@ function cardHtml(it){
       + diffChip(it.diff)
       + (done[it.id]?'<span class="chip donec">✓ изучено</span>':'')
       + (hd?'<span class="chip hidec">🙈 скрыт</span>':'')
-      + (state.view==='learn' ? '<span class="chip">'+(views[it.id]?'👁 '+views[it.id]:'👁 новый')+'</span>' : '')
+      + (state.view==='train' ? '<span class="chip">'+(views[it.id]?'👁 '+views[it.id]:'👁 новый')+'</span>' : '')
       + '</div>';
   var cact = '<div class="cact">'
       + '<button class="ic'+(favs[it.id]?' on star':'')+'" data-act="fav" data-id="'+it.id+'" title="В избранное">'+(favs[it.id]?'★':'☆')+'</button>'
@@ -603,76 +602,32 @@ function renderDetail(){
 }
 
 /* ----------------------------- train view ----------------------------- */
-function shuffleArr(a){
-  for (var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; }
-}
 function trainStart(){
   recompute();
-  train.list = state.filtered.slice();
-  if (train.shuffled) shuffleArr(train.list);
-  train.i = 0;
-}
-function trainNext(skipKnown){
-  if (train.i < train.list.length) train.i++;
-  if (train.i >= train.list.length){
-    train.i = 0;
-  }
-  renderTrain();
+  train.list = learnOrder(state.filtered);
 }
 function renderTrain(){
-  recompute();
   var list = train.list;
   var html = '';
   if (!list.length){
     html = '<div class="empty">Нет вопросов под текущие фильтры.<br>Настройте фильтры и нажмите «Тренировка».</div>';
     $('#viewroot').innerHTML = html; return;
   }
-  var it = list[train.i];
-  if (train.countedId !== it.id){
-    train.countedId = it.id;
-    views[it.id] = (views[it.id]||0) + 1;
-    saveState();
-  }
-  var src = SRC[it.src];
-  var learned = list.filter(function(x){ return done[x.id]; }).length;
-  html = '<div class="train-top">'
-      + '<div class="chead"><span class="badge" title="'+esc(src.title)+'">'+esc(src.short)+'</span>'
-      + (it.num?'<span class="chip">#'+esc(it.num)+'</span>':'')
-      + tagsChips(it.tags)
-      + (it.icon?'<span>'+it.icon+'</span>':'')
-      + diffChip(it.diff) + '</div>'
-      + '<div class="train-nav"><span class="counter">'+(train.i+1)+' / '+list.length+'</span>'
-      + '<label class="chk"><input type="checkbox" id="shuf"'+(train.shuffled?' checked':'')+'> перемешать</label>'
-      + '<button class="reset" data-act="train-reset">назад</button>'
-      + '</div></div>'
-      + '<div class="train-card">'
-      + '<div class="tq">'+esc(it.q)+'</div>'
-      + '<div class="tans">'
-      + (it.short ? '<section class="ans"><h3>Краткий ответ</h3><div class="ansbody">'+md(it.short)+'</div></section>' : '')
-      + '<section class="ans"><h3>'+(it.short?'Развернутый ответ':'Ответ')+'</h3><div class="ansbody">'+md(it.long || '—')+'</div></section>'
-      + '</div>'
-      + '<div class="tactions">'
-      + '<button data-act="train-known">✓ Знаю</button><button data-act="train-skip">↺ Повторить позже</button>'
-      + '<button data-act="hide" data-id="'+it.id+'" title="Скрыть вопрос из списков">🙈 скрыть</button>'
-      + '</div>'
-      + '</div>'
-      + '<div class="pager" style="margin-top:12px">'
-      + (train.i>0 ? '<button data-act="train-prev">← назад</button>' : '<span></span>')
-      + '<span class="pcount">изучено в наборе: '+learned+' / '+list.length+'</span>'
-      + (train.i<list.length-1 ? '<button data-act="train-next">дальше →</button>' : '<span></span>')
+  html = '<div class="toolbar"><div class="count">Тренировка: '+list.length
+      + ' · просмотров всего: '+viewsTotal()+'</div><div class="chipc">'+activeChips()+'</div></div>';
+  html += '<div class="learnbar">'
+      + '<button data-act="train-shuffle">🔄 перетасовать список</button>'
+      + '<button data-act="train-reset">← к чтению</button>'
       + '</div>';
+  html += '<div class="cards">';
+  list.forEach(function(it){ html += cardHtml(it); });
+  html += '</div>';
   $('#viewroot').innerHTML = html;
-  var shuf = $('#shuf');
-  if (shuf) shuf.addEventListener('change', function(){
-    train.shuffled = this.checked;
-    trainStart(); renderTrain();
-  });
   window.scrollTo(0,0);
 }
 
-/* ----------------------------- learn view ----------------------------- */
-var learn = { list: [] };
-/* Взвешенный порядок: не просмотренные чаще сверху, порядок разный при каждом вызове.
+/* ----------------------------- weighted order -----------------------------
+   Взвешенный порядок: не просмотренные чаще сверху, порядок разный при каждом вызове.
    key_i = U^(1+w_i), w_i = 1/(1+просмотров); сортировка по key по убыванию
    (Efraimidis–Spirakis). rnd подменяемый — для тестов. */
 function learnOrder(list, rnd){
@@ -682,37 +637,14 @@ function learnOrder(list, rnd){
     return { it: it, key: Math.pow(rnd(), 1/w) };
   }).sort(function(a,b){ return b.key - a.key; }).map(function(x){ return x.it; });
 }
-function learnBuild(){
-  recompute();
-  learn.list = learnOrder(state.filtered);
-}
 function viewsTotal(){
   var s = 0; for (var k in views){ if (views[k]) s += views[k]; }
   return s;
-}
-function renderLearn(){
-  var list = learn.list;
-  var html = '<div class="toolbar"><div class="count">Учебный список: '+list.length
-      + ' · просмотров всего: '+viewsTotal()+'</div><div class="chipc">'+activeChips()+'</div></div>';
-  html += '<div class="learnbar">'
-      + '<button data-act="learn-shuffle">🔄 перетасовать</button>'
-      + '<button data-act="train-reset">← к списку</button>'
-      + '</div>';
-  if (!list.length){
-    html += '<div class="empty">Нет вопросов под текущие фильтры.<br>Настройте фильтры в левой панели.</div>';
-    $('#viewroot').innerHTML = html; return;
-  }
-  html += '<div class="cards">';
-  list.forEach(function(it){ html += cardHtml(it); });
-  html += '</div>';
-  $('#viewroot').innerHTML = html;
-  window.scrollTo(0,0);
 }
 
 /* ----------------------------- actions ----------------------------- */
 function refreshPool(){
   if (state.view==='train') trainStart();
-  else if (state.view==='learn') learnBuild();
 }
 
 function handleAct(el, ev){
@@ -740,7 +672,6 @@ function handleAct(el, ev){
     case 'hide':
       if (hidden[id]) delete hidden[id]; else hidden[id]=1;
       saveState();
-      if (state.view==='train'){ trainStart(); trainNext(); break; }
       refreshPool(); renderAll(); break;
     case 'unhide-all':
       hidden = {}; saveState();
@@ -763,14 +694,13 @@ function handleAct(el, ev){
       saveState(); renderAll(); break;
     case 'done':
       if (done[id]) delete done[id]; else done[id]=1;
-      if (state.view==='train' && !done[id]) { saveState(); trainNext(); break; }
       saveState(); renderAll(); break;
     case 'open':
       views[id] = (views[id]||0) + 1; saveState();
       state.from = state.view;
       state.cur = QS.filter(function(q){ return q.id === +id; })[0];
       state.view = 'detail'; renderAll(); break;
-    case 'back': state.view = (state.from==='learn') ? 'learn' : 'list'; state.cur=null; renderAll(); break;
+    case 'back': state.view = (state.from==='train') ? 'train' : 'list'; state.cur=null; renderAll(); break;
     case 'prev': case 'next': {
       recompute();
       var idx = state.filtered.indexOf(state.cur);
@@ -778,19 +708,11 @@ function handleAct(el, ev){
       if (act==='next' && idx < state.filtered.length-1) state.cur = state.filtered[idx+1];
       renderAll(); break;
     }
-    case 'train-known':
-      done[it_id_of_train()] = 1; saveState(); trainNext(); break;
-    case 'train-skip': trainNext(); break;
-    case 'train-next': trainNext(); break;
-    case 'train-prev':
-      if (train.i>0) train.i--;
-      renderTrain(); break;
-    case 'learn-shuffle': learnBuild(); renderAll(); break;
-    case 'train-reset': case 'learn-reset': state.view='list'; state.cur=null; renderAll(); break;
+    case 'train-shuffle': trainStart(); renderAll(); break;
+    case 'train-reset': state.view='list'; state.cur=null; renderAll(); break;
   }
   ev && ev.stopPropagation && ev.stopPropagation();
 }
-function it_id_of_train(){ return train.list[train.i].id; }
 function removeChip(k){
   if (k==='search'){ state.search=''; $('#search').value=''; }
   else if (k.indexOf('src:')===0) state.srcs.delete(+k.slice(4));
@@ -810,12 +732,9 @@ function setView(v){
   state.view = v;
   $('#mode-list').classList.toggle('on', v==='list' || v==='detail');
   $('#mode-train').classList.toggle('on', v==='train');
-  $('#mode-learn').classList.toggle('on', v==='learn');
   if (v==='train') trainStart();
-  if (v==='learn') learnBuild();
   store.set('qa.mode', v);
   renderAll();
-  $('#search').style.visibility = (v==='train') ? 'hidden' : 'visible';
 }
 
 function renderAll(){
@@ -823,7 +742,6 @@ function renderAll(){
   recompute();
   if (state.view==='train') renderTrain();
   else if (state.view==='detail') renderDetail();
-  else if (state.view==='learn') renderLearn();
   else renderList();
 }
 
@@ -839,17 +757,15 @@ function setThemeColor(t){
 
 $('#search').addEventListener('input', function(){
   state.search = this.value;
-  if (state.view==='train') trainStart();
-  else if (state.view==='learn'){
+  if (state.view==='train'){
     recompute();
     var alive = {}; state.filtered.forEach(function(it){ alive[it.id]=1; });
-    learn.list = learn.list.filter(function(it){ return alive[it.id]; });
+    train.list = train.list.filter(function(it){ return alive[it.id]; });
   }
   renderAll();
 });
 $('#mode-list').addEventListener('click', function(){ setView('list'); });
 $('#mode-train').addEventListener('click', function(){ setView('train'); });
-$('#mode-learn').addEventListener('click', function(){ setView('learn'); });
 $('#theme').addEventListener('click', function(){
   var t = (document.documentElement.getAttribute('data-theme')==='dark') ? 'light' : 'dark';
   document.documentElement.setAttribute('data-theme', t);
@@ -874,6 +790,7 @@ document.getElementById('main').addEventListener('click', function(e){
   if (t){ handleAct(t, e); return; }
   var card = e.target.closest('.card[data-id]');
   if (card){
+    views[card.dataset.id] = (views[card.dataset.id]||0) + 1; saveState();
     state.cur = QS.filter(function(q){ return q.id === +card.dataset.id; })[0];
     state.view = 'detail'; renderAll();
   }
@@ -884,10 +801,7 @@ document.getElementById('main').addEventListener('keydown', function(e){
 
 document.addEventListener('keydown', function(e){
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-  if (state.view === 'train' && train.list.length){
-    if (e.code === 'Space' || e.code === 'ArrowRight'){ e.preventDefault(); trainNext(); }
-    if (e.code === 'ArrowLeft' && train.i>0){ train.i--; renderTrain(); }
-  } else if (state.view === 'detail') {
+  if (state.view === 'detail') {
     if (e.code === 'ArrowLeft') handleAct({getAttribute:function(){return 'prev';}}, null);
     if (e.code === 'ArrowRight') handleAct({getAttribute:function(){return 'next';}}, null);
   }
@@ -896,7 +810,7 @@ document.addEventListener('keydown', function(e){
 document.documentElement.setAttribute('data-theme', store.get('qa.theme', matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
 setThemeColor(document.documentElement.getAttribute('data-theme'));
 var savedMode = store.get('qa.mode', 'list');
-if (['list','train','learn'].indexOf(savedMode) < 0) savedMode = 'list';
+if (['list','train'].indexOf(savedMode) < 0) savedMode = 'list';
 setView(savedMode);
 
 </script>
