@@ -91,10 +91,9 @@ html[data-theme=dark] .chip.donec{background:#12301f;border-color:#235c3a;color:
 .kchip:hover{filter:brightness(.97)}
 .tcloud{background:var(--panel2);border:1px solid var(--border);border-radius:10px;
   padding:6px 6px 8px;margin:2px 4px 8px}
-.tcloud-head{display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;-webkit-user-select:none}
+.tcloud-head{display:flex;align-items:center;gap:6px}
 .tcloud-title{font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
 .tcloud-cnt{font-size:11.5px;color:var(--muted)}
-.tcloud-arrow{margin-left:auto;color:var(--muted);font-size:13px}
 .tcloud-body{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
 .tagchip .tc-n{opacity:.55;font-size:.85em;margin-left:1px}
 .back{background:transparent;border:0;color:var(--accent);cursor:pointer;font-size:14px;padding:0 2px 12px}
@@ -444,7 +443,6 @@ function renderSidebar(){
 }
 
 /* ----------------------------- tag cloud в левой панели ----------------------------- */
-var tcOpen = store.get('qa.tcloud.open', false);
 function tagCounts(){
   var m = {};
   QS.forEach(function(it){ (it.tags||[]).forEach(function(t){ m[t]=(m[t]||0)+1; }); });
@@ -455,22 +453,18 @@ function tagCloudHtml(){
   var keys = Object.keys(m);
   keys.sort(function(a,b){ return m[b]-m[a] || (a<b?-1:1); });
   if (!keys.length) return '';
-  var html = '<div class="tcloud"><div class="tcloud-head" data-act="tcloud" title="Показать/скрыть облако тегов">'
+  var html = '<div class="tcloud"><div class="tcloud-head">'
       + '<span class="tcloud-title">🏷 Облако тегов</span>'
       + '<span class="tcloud-cnt">'+keys.length+'</span>'
       + (state.tags.size ? '<span class="tcloud-cnt">· выбрано '+state.tags.size+'</span>' : '')
-      + '<span class="tcloud-arrow">'+(tcOpen?'▾':'▸')+'</span>'
-      + '</div>';
-  if (tcOpen){
-    html += '<div class="tcloud-body">';
-    keys.forEach(function(t){
-      var on = state.tags.has(t);
-      html += '<span class="chip tagchip'+(on?' on':'')+'" data-act="tag" data-id="'+esc(t)+'"'
-          + ' title="'+esc(t)+': '+m[t]+'">'+esc(t)+'<span class="tc-n">'+m[t]+'</span></span>';
-    });
-    html += '</div>';
-  }
-  html += '</div>';
+      + '</div>'
+      + '<div class="tcloud-body">';
+  keys.forEach(function(t){
+    var on = state.tags.has(t);
+    html += '<span class="chip tagchip'+(on?' on':'')+'" data-act="tag" data-id="'+esc(t)+'"'
+        + ' title="'+esc(t)+': '+m[t]+'">'+esc(t)+'<span class="tc-n">'+m[t]+'</span></span>';
+  });
+  html += '</div></div>';
   return html;
 }
 
@@ -648,8 +642,6 @@ function handleAct(el, ev){
       document.body.classList.remove('filters-open');
       syncFilterBtn();
       break;
-    case 'tcloud':
-      tcOpen = !tcOpen; store.set('qa.tcloud.open', tcOpen); renderAll(); break;
     case 'chip': removeChip(id); renderAll(); break;
     case 'fav':
       if (favs[id]) delete favs[id]; else favs[id]=1;
