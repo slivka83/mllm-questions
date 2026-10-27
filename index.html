@@ -672,7 +672,7 @@ function handleAct(el, ev){
       saveState(); renderAll(); break;
     case 'open':
       views[id] = (views[id]||0) + 1; saveState();
-      state.from = state.view;
+      if (state.view !== 'detail') state.from = state.view;
       state.cur = QS.filter(function(q){ return q.id === +id; })[0];
       state.view = 'detail'; renderAll(); break;
     case 'back': state.view = (state.from==='train') ? 'train' : 'list'; state.cur=null; renderAll(); break;
@@ -771,6 +771,7 @@ document.getElementById('main').addEventListener('click', function(e){
   var card = e.target.closest('.card[data-id]');
   if (card){
     views[card.dataset.id] = (views[card.dataset.id]||0) + 1; saveState();
+    state.from = state.view;
     state.cur = QS.filter(function(q){ return q.id === +card.dataset.id; })[0];
     state.view = 'detail'; renderAll();
   }
