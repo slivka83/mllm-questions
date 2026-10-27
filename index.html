@@ -96,7 +96,15 @@ html[data-theme=dark] .chip.donec{background:#12301f;border-color:#235c3a;color:
 .tcloud-cnt{font-size:11.5px;color:var(--muted)}
 .tcloud-body{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
 .tagchip .tc-n{opacity:.55;font-size:.85em;margin-left:1px}
-.back{background:transparent;border:0;color:var(--accent);cursor:pointer;font-size:14px;padding:0 2px 12px}
+.back{background:transparent;border:0;color:var(--accent);cursor:pointer;font-size:14px;padding:0 2px}
+.dtopbar{position:sticky;top:var(--hdr,58px);z-index:19;display:flex;align-items:center;gap:10px;
+  background:var(--bg);padding:10px 2px}
+.dtopbar .pcount{color:var(--muted);font-size:12.5px;white-space:nowrap}
+.dnav{margin-left:auto;max-width:38%;min-width:0;text-align:left;padding:8px 12px;border-radius:10px;
+  border:1px solid var(--border);background:var(--panel);color:var(--text);cursor:pointer;font-size:12.5px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dnav:hover{border-color:var(--accent)}
+.dtopbar .dnav+.dnav{margin-left:0}
 .back:hover{text-decoration:underline}
 .detail{padding:18px 22px;box-shadow:var(--shadow);margin-bottom:12px}
 .dq{font-size:19px;line-height:1.45;margin:10px 0 14px}
@@ -116,11 +124,6 @@ html[data-theme=dark] .chip.donec{background:#12301f;border-color:#235c3a;color:
 .tagchip:hover{border-color:var(--accent);color:var(--accent)}
 .tagchip.on{background:var(--accent);border-color:var(--accent);color:#fff}
 .ansbody th,.ansbody td{border:1px solid var(--border);padding:4px 10px}
-.pager{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.pager button{max-width:45%;text-align:left;padding:10px 14px;border-radius:10px;border:1px solid var(--border);
-  background:var(--panel);color:var(--text);cursor:pointer;font-size:13px}
-.pager button:hover{border-color:var(--accent)}
-.pager .pcount{color:var(--muted);font-size:12.5px;white-space:nowrap}
 .train-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
 .train-top .cmeta{margin:0}
 .train-nav{margin-left:auto;display:flex;align-items:center;gap:10px}
@@ -163,7 +166,10 @@ kbd{font-family:inherit;font-size:11px;border:1px solid var(--border);border-bot
   .train-card{padding:16px 14px}
   .tq{font-size:18px}
   .tactions button{height:44px;flex:1 1 auto;font-size:15px}
-  .pager button{font-size:12.5px;max-width:48%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dtopbar{gap:6px;flex-wrap:nowrap}
+  .dtopbar .back{font-size:13px}
+  .dtopbar .pcount{font-size:11.5px;white-space:nowrap}
+  .dnav{max-width:30%;font-size:11.5px;padding:9px 10px}
   .ansbody{overflow-wrap:break-word}
   .ansbody table{display:block;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
 }
@@ -539,7 +545,12 @@ function renderDetail(){
   var prev = idx>0 ? state.filtered[idx-1] : null;
   var next = idx<state.filtered.length-1 ? state.filtered[idx+1] : null;
   var src = SRC[it.src];
-  var html = '<button class="back" data-act="back">← к списку</button>'
+  var html = '<div class="dtopbar">'
+      + '<button class="back" data-act="back">← к списку</button>'
+      + '<span class="pcount">'+(idx+1)+' из '+state.filtered.length+'</span>'
+      + (prev ? '<button class="dnav" data-act="open" data-id="'+prev.id+'" title="'+esc(prev.q)+'">← '+esc(cut(prev.q,44))+'</button>' : '<span class="dnav-sp"></span>')
+      + (next ? '<button class="dnav" data-act="open" data-id="'+next.id+'" title="'+esc(next.q)+'">'+esc(cut(next.q,44))+' →</button>' : '<span class="dnav-sp"></span>')
+      + '</div>'
       + '<article class="detail">'
       + '<div class="chead">'
       + '<span class="badge" title="'+esc(src.title)+'">'+esc(src.short)+'</span>'
@@ -554,12 +565,7 @@ function renderDetail(){
       + '</div>'
       + (it.short ? '<section class="ans"><h3>Краткий ответ</h3><div class="ansbody">'+md(it.short)+'</div></section>' : '')
       + '<section class="ans"><h3>'+(it.short?'Развернутый ответ':'Ответ')+'</h3><div class="ansbody">'+md(it.long || '—')+'</div></section>'
-      + '</article>'
-      + '<div class="pager">'
-      + (prev ? '<button data-act="open" data-id="'+prev.id+'">← '+esc(cut(prev.q,52))+'</button>' : '<span></span>')
-      + '<span class="pcount">'+(idx+1)+' из '+state.filtered.length+'</span>'
-      + (next ? '<button data-act="open" data-id="'+next.id+'">'+esc(cut(next.q,52))+' →</button>' : '<span></span>')
-      + '</div>';
+      + '</article>';
   $('#viewroot').innerHTML = html;
   window.scrollTo(0,0);
 }
@@ -706,6 +712,13 @@ function setThemeColor(t){
   var m = $('#thc');
   if (m) m.setAttribute('content', t==='dark' ? '#0e131e' : '#eef1f5');
 }
+function syncStickyTop(){
+  var h = document.querySelector('header');
+  if (!h) return;
+  var x = h.offsetHeight;
+  if (typeof x !== 'number' || !document.documentElement.style || !document.documentElement.style.setProperty) return;
+  document.documentElement.style.setProperty('--hdr', x+'px');
+}
 
 $('#search').addEventListener('input', function(){
   state.search = this.value;
@@ -761,6 +774,8 @@ document.addEventListener('keydown', function(e){
 
 document.documentElement.setAttribute('data-theme', store.get('qa.theme', matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
 setThemeColor(document.documentElement.getAttribute('data-theme'));
+syncStickyTop();
+if (window.addEventListener) window.addEventListener('resize', syncStickyTop);
 var savedMode = store.get('qa.mode', 'list');
 if (['list','train'].indexOf(savedMode) < 0) savedMode = 'list';
 setView(savedMode);
