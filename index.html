@@ -399,15 +399,6 @@ function renderSidebar(){
   html += '<button class="dclose" data-act="dclose">✕ Закрыть</button>';
   html += tagCloudHtml();
 
-  html += '<div class="fgrp"><div class="fgrp-title">Источники</div>';
-  DATA.sources.forEach(function(s){
-    var on = state.srcs.has(s.id);
-    html += '<button class="frow'+(on?' on':'')+'" data-act="src" data-id="'+s.id+'">'
-         +  '<span class="cb">'+(on?'☑':'☐')+'</span>'
-         +  '<span class="ftitle">'+esc(s.title)+'</span><span class="fc">'+s.count+'</span></button>';
-  });
-  html += '</div>';
-
   var bCount = countBy(function(it){ return it.block||''; });
   var bTitle = {};
   DATA.sources.forEach(function(s){ return s; });
@@ -422,21 +413,6 @@ function renderSidebar(){
          +  '<span class="ftitle">'+esc(blockName({block:b}))+'</span><span class="fc">'+bCount[b]+'</span></button>';
   });
   html += '</div>';
-
-  var tCount = {};
-  QS.forEach(function(it){ (it.tags||[]).forEach(function(t){ tCount[t]=(tCount[t]||0)+1; }); });
-  var tKeys = Object.keys(tCount);
-  if (tKeys.length){
-    html += '<div class="fgrp"><div class="fgrp-title">Теги ('+tKeys.length+')</div>';
-    tKeys.sort(function(a,b){ return tCount[b]-tCount[a]; });
-    tKeys.forEach(function(t){
-      var on = state.tags.has(t);
-      html += '<button class="frow'+(on?' on':'')+'" data-act="tag" data-id="'+esc(t)+'">'
-           +  '<span class="cb">'+(on?'☑':'☐')+'</span>'
-           +  '<span class="ftitle">'+esc(t)+'</span><span class="fc">'+tCount[t]+'</span></button>';
-    });
-    html += '</div>';
-  }
 
   var dCount = {};
   QS.forEach(function(it){ var d=it.diff; if(!d) return; dCount[d]=(dCount[d]||0)+1; });
