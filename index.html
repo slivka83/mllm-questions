@@ -268,10 +268,44 @@ function fallbackMd(src){
   if (inCode) out.push('</code></pre>');
   return out.join('\n');
 }
+
+/* --- сплошные абзацы: раскладываем «Заголовок: …» и «(N) …» в пункты списка ---
+   Работает только на УЖЁНЧЕННЫХ строках (>320 символов), вне код-блоков;
+   название пункта = слово с заглавной буквы, без точек внутри, до двоеточия. */
+function smartBullets(line){
+  if (line.length < 320 || line.indexOf(': ') < 0) return line;
+  var re = /([.;]\s+)(([А-ЯЁA-Z][^.:;\n]{2,46}:\s)|(\(\d{1,2}\)\s))/g;
+  var cuts = [];
+  var m;
+  while ((m = re.exec(line)) !== null){
+    if (m.index === 0) continue;
+    if (m[3] && !/[а-яёa-z]/.test(m[3])) continue;  // «LLM:», «API:» — не пункты
+    cuts.push({ i: m.index, sep: m[1].length });
+  }
+  if (cuts.length < 2) return line;
+  var out = '';
+  var prev = 0;
+  for (var k = 0; k < cuts.length; k++){
+    out += line.slice(prev, cuts[k].i) + '\n- ';
+    prev = cuts[k].i + cuts[k].sep;
+  }
+  out += line.slice(prev);
+  return out;
+}
+function structureFences(src){
+  var lines = String(src||'').split('\n');
+  var inFence = false;
+  var outl = [];
+  for (var i = 0; i < lines.length; i++){
+    if (/^\s*```/.test(lines[i])){ inFence = !inFence; outl.push(lines[i]); continue; }
+    outl.push(inFence ? lines[i] : smartBullets(lines[i]));
+  }
+  return outl.join('\n');
+}
 function md(src){
   if (!src) return '';
   var st = [];
-  var text = stashMath(src, st);
+  var text = stashMath(structureFences(src), st);
   var html;
   if (window.marked && window.marked.parse){
     try { html = window.marked.parse(text, {gfm:true, breaks:false}); }
