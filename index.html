@@ -237,7 +237,7 @@ var state = {
   favOnly: false, undoneOnly: false, hiddenOnly: false,
   filtered: [], cur: null, from: 'list'
 };
-var train = { list: [], i: 0, revealed: false, showLong: false, shuffled: false };
+var train = { list: [], i: 0, revealed: false, shuffled: false };
 
 /* ----------------------------- markdown ----------------------------- */
 function escMd(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -610,10 +610,10 @@ function trainStart(){
   recompute();
   train.list = state.filtered.slice();
   if (train.shuffled) shuffleArr(train.list);
-  train.i = 0; train.revealed = false; train.showLong = false;
+  train.i = 0; train.revealed = false;
 }
 function trainNext(skipKnown){
-  train.revealed = false; train.showLong = false;
+  train.revealed = false;
   if (train.i < train.list.length) train.i++;
   if (train.i >= train.list.length){
     train.i = 0;
@@ -645,17 +645,13 @@ function renderTrain(){
       + '<div class="tq">'+esc(it.q)+'</div>'
       + '<div class="tans'+(train.revealed?'':' hidden')+'">'
       + (it.short ? '<section class="ans"><h3>Краткий ответ</h3><div class="ansbody">'+md(it.short)+'</div></section>' : '')
-      + '<div class="tactions">'
-      + '<button data-act="reveal-long">'+(train.showLong?'▾ свернуть':'▸ развернутый ответ')+'</button>'
-      + '<button data-act="fav" data-id="'+it.id+'"'+(favs[it.id]?' style="border-color:#f59e0b;color:#f59e0b"':'')+'>'+(favs[it.id]?'★ избранное':'☆ в избранное')+'</button>'
-      + '<button data-act="hide" data-id="'+it.id+'" title="Скрыть вопрос из списков">🙈 скрыть</button>'
-      + '</div>'
-      + '<section class="ans'+(train.showLong?'':' hidden')+'"><h3>'+(it.short?'Развернутый ответ':'Ответ')+'</h3><div class="ansbody">'+md(it.long || '—')+'</div></section>'
+      + '<section class="ans"><h3>'+(it.short?'Развернутый ответ':'Ответ')+'</h3><div class="ansbody">'+md(it.long || '—')+'</div></section>'
       + '</div>'
       + '<div class="tactions">'
       + (train.revealed
           ? '<button data-act="train-known">✓ Знаю</button><button data-act="train-skip">↺ Повторить позже</button>'
           : '<button class="primary" data-act="reveal">Показать ответ &nbsp;<kbd>Space</kbd></button>')
+      + '<button data-act="hide" data-id="'+it.id+'" title="Скрыть вопрос из списков">🙈 скрыть</button>'
       + '</div>'
       + '</div>'
       + '<div class="pager" style="margin-top:12px">'
@@ -783,13 +779,12 @@ function handleAct(el, ev){
     case 'reveal':
       views[it_id_of_train()] = (views[it_id_of_train()]||0) + 1; saveState();
       train.revealed = true; renderTrain(); break;
-    case 'reveal-long': train.showLong = !train.showLong; renderTrain(); break;
     case 'train-known':
       done[it_id_of_train()] = 1; saveState(); trainNext(); break;
     case 'train-skip': trainNext(); break;
     case 'train-next': trainNext(); break;
     case 'train-prev':
-      train.revealed=false; train.showLong=false;
+      train.revealed=false;
       if (train.i>0) train.i--;
       renderTrain(); break;
     case 'learn-shuffle': learnBuild(); renderAll(); break;
@@ -820,6 +815,7 @@ function setView(v){
   $('#mode-learn').classList.toggle('on', v==='learn');
   if (v==='train') trainStart();
   if (v==='learn') learnBuild();
+  store.set('qa.mode', v);
   renderAll();
   $('#search').style.visibility = (v==='train') ? 'hidden' : 'visible';
 }
@@ -893,7 +889,7 @@ document.addEventListener('keydown', function(e){
   if (state.view === 'train' && train.list.length){
     if (e.code === 'Space'){ e.preventDefault(); if (!train.revealed){ train.revealed = true; renderTrain(); } else trainNext(); }
     if (e.code === 'ArrowRight') trainNext();
-    if (e.code === 'ArrowLeft'){ train.revealed=false; train.showLong=false; if (train.i>0){ train.i--; renderTrain(); } }
+    if (e.code === 'ArrowLeft'){ train.revealed=false; if (train.i>0){ train.i--; renderTrain(); } }
   } else if (state.view === 'detail') {
     if (e.code === 'ArrowLeft') handleAct({getAttribute:function(){return 'prev';}}, null);
     if (e.code === 'ArrowRight') handleAct({getAttribute:function(){return 'next';}}, null);
@@ -902,7 +898,9 @@ document.addEventListener('keydown', function(e){
 
 document.documentElement.setAttribute('data-theme', store.get('qa.theme', matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
 setThemeColor(document.documentElement.getAttribute('data-theme'));
-setView('list');
+var savedMode = store.get('qa.mode', 'list');
+if (['list','train','learn'].indexOf(savedMode) < 0) savedMode = 'list';
+setView(savedMode);
 
 </script>
 </body>
