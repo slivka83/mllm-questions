@@ -485,7 +485,7 @@ function tagCloudHtml(){
   keys.sort(function(a,b){ return m[b]-m[a] || (a<b?-1:1); });
   if (!keys.length) return '';
   var html = '<div class="tcloud"><div class="tcloud-head">'
-      + '<span class="tcloud-title">🏷 Облако тегов</span>'
+      + '<span class="tcloud-title">Облако тегов</span>'
       + '<span class="tcloud-cnt">'+keys.length+'</span>'
       + (state.tags.size ? '<span class="tcloud-cnt">· выбрано '+state.tags.size+'</span>' : '')
       + '</div>'
