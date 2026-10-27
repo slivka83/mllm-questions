@@ -84,9 +84,6 @@ html[data-theme=dark] .chip.donec{background:#12301f;border-color:#235c3a;color:
 .ic.done.on{color:var(--ok)}
 .toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:2px 2px 12px}
 .count{font-size:13px;color:var(--muted);white-space:nowrap}
-.learnbar{display:flex;gap:8px;flex-wrap:wrap;margin:0 2px 12px}
-.learnbar button{height:36px;padding:0 14px;border-radius:9px;border:1px solid var(--border);
-  background:var(--panel2);color:var(--text);cursor:pointer;font-size:13.5px}
 .mutedcnt{color:var(--muted);opacity:.75;font-size:12px}
 .chipc{display:flex;gap:6px;flex-wrap:wrap}
 .kchip{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:3px 10px;border-radius:999px;
@@ -167,7 +164,6 @@ kbd{font-family:inherit;font-size:11px;border:1px solid var(--border);border-bot
   .train-card{padding:16px 14px}
   .tq{font-size:18px}
   .tactions button{height:44px;flex:1 1 auto;font-size:15px}
-  .learnbar button{height:42px;font-size:14px}
   .pager button{font-size:12.5px;max-width:48%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .ansbody{overflow-wrap:break-word}
   .ansbody table{display:block;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
@@ -529,7 +525,6 @@ function cardHtml(it){
       + diffChip(it.diff)
       + (done[it.id]?'<span class="chip donec">✓ изучено</span>':'')
       + (hd?'<span class="chip hidec">🙈 скрыт</span>':'')
-      + (state.view==='train' ? '<span class="chip">'+(views[it.id]?'👁 '+views[it.id]:'👁 новый')+'</span>' : '')
       + '</div>';
   var cact = '<div class="cact">'
       + '<button class="ic'+(favs[it.id]?' on star':'')+'" data-act="fav" data-id="'+it.id+'" title="В избранное">'+(favs[it.id]?'★':'☆')+'</button>'
@@ -608,17 +603,14 @@ function trainStart(){
 }
 function renderTrain(){
   var list = train.list;
-  var html = '';
+  var nh = 0; QS.forEach(function(it){ if (hidden[it.id]) nh++; });
+  var total = state.hiddenOnly ? nh : (QS.length - nh);
+  var html = '<div class="toolbar"><div class="count">Найдено: '+list.length+' из '+total+'</div>'
+      + '<div class="chipc">'+activeChips()+'</div></div>';
   if (!list.length){
-    html = '<div class="empty">Нет вопросов под текущие фильтры.<br>Настройте фильтры и нажмите «Тренировка».</div>';
+    html += '<div class="empty">Нет вопросов под текущие фильтры.<br>Настройте фильтры и нажмите «Тренировка».</div>';
     $('#viewroot').innerHTML = html; return;
   }
-  html = '<div class="toolbar"><div class="count">Тренировка: '+list.length
-      + ' · просмотров всего: '+viewsTotal()+'</div><div class="chipc">'+activeChips()+'</div></div>';
-  html += '<div class="learnbar">'
-      + '<button data-act="train-shuffle">🔄 перетасовать список</button>'
-      + '<button data-act="train-reset">← к чтению</button>'
-      + '</div>';
   html += '<div class="cards">';
   list.forEach(function(it){ html += cardHtml(it); });
   html += '</div>';
@@ -636,10 +628,6 @@ function learnOrder(list, rnd){
     var w = 1 / (1 + (views[it.id]||0));
     return { it: it, key: Math.pow(rnd(), 1/w) };
   }).sort(function(a,b){ return b.key - a.key; }).map(function(x){ return x.it; });
-}
-function viewsTotal(){
-  var s = 0; for (var k in views){ if (views[k]) s += views[k]; }
-  return s;
 }
 
 /* ----------------------------- actions ----------------------------- */
@@ -708,8 +696,6 @@ function handleAct(el, ev){
       if (act==='next' && idx < state.filtered.length-1) state.cur = state.filtered[idx+1];
       renderAll(); break;
     }
-    case 'train-shuffle': trainStart(); renderAll(); break;
-    case 'train-reset': state.view='list'; state.cur=null; renderAll(); break;
   }
   ev && ev.stopPropagation && ev.stopPropagation();
 }
