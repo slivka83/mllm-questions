@@ -237,7 +237,7 @@ var state = {
   favOnly: false, undoneOnly: false, hiddenOnly: false,
   filtered: [], cur: null, from: 'list'
 };
-var train = { list: [], i: 0, revealed: false, shuffled: false };
+var train = { list: [], i: 0, shuffled: false, countedId: null };
 
 /* ----------------------------- markdown ----------------------------- */
 function escMd(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -610,10 +610,9 @@ function trainStart(){
   recompute();
   train.list = state.filtered.slice();
   if (train.shuffled) shuffleArr(train.list);
-  train.i = 0; train.revealed = false;
+  train.i = 0;
 }
 function trainNext(skipKnown){
-  train.revealed = false;
   if (train.i < train.list.length) train.i++;
   if (train.i >= train.list.length){
     train.i = 0;
@@ -629,6 +628,11 @@ function renderTrain(){
     $('#viewroot').innerHTML = html; return;
   }
   var it = list[train.i];
+  if (train.countedId !== it.id){
+    train.countedId = it.id;
+    views[it.id] = (views[it.id]||0) + 1;
+    saveState();
+  }
   var src = SRC[it.src];
   var learned = list.filter(function(x){ return done[x.id]; }).length;
   html = '<div class="train-top">'
@@ -643,14 +647,12 @@ function renderTrain(){
       + '</div></div>'
       + '<div class="train-card">'
       + '<div class="tq">'+esc(it.q)+'</div>'
-      + '<div class="tans'+(train.revealed?'':' hidden')+'">'
+      + '<div class="tans">'
       + (it.short ? '<section class="ans"><h3>Краткий ответ</h3><div class="ansbody">'+md(it.short)+'</div></section>' : '')
       + '<section class="ans"><h3>'+(it.short?'Развернутый ответ':'Ответ')+'</h3><div class="ansbody">'+md(it.long || '—')+'</div></section>'
       + '</div>'
       + '<div class="tactions">'
-      + (train.revealed
-          ? '<button data-act="train-known">✓ Знаю</button><button data-act="train-skip">↺ Повторить позже</button>'
-          : '<button class="primary" data-act="reveal">Показать ответ &nbsp;<kbd>Space</kbd></button>')
+      + '<button data-act="train-known">✓ Знаю</button><button data-act="train-skip">↺ Повторить позже</button>'
       + '<button data-act="hide" data-id="'+it.id+'" title="Скрыть вопрос из списков">🙈 скрыть</button>'
       + '</div>'
       + '</div>'
@@ -776,15 +778,11 @@ function handleAct(el, ev){
       if (act==='next' && idx < state.filtered.length-1) state.cur = state.filtered[idx+1];
       renderAll(); break;
     }
-    case 'reveal':
-      views[it_id_of_train()] = (views[it_id_of_train()]||0) + 1; saveState();
-      train.revealed = true; renderTrain(); break;
     case 'train-known':
       done[it_id_of_train()] = 1; saveState(); trainNext(); break;
     case 'train-skip': trainNext(); break;
     case 'train-next': trainNext(); break;
     case 'train-prev':
-      train.revealed=false;
       if (train.i>0) train.i--;
       renderTrain(); break;
     case 'learn-shuffle': learnBuild(); renderAll(); break;
@@ -887,9 +885,8 @@ document.getElementById('main').addEventListener('keydown', function(e){
 document.addEventListener('keydown', function(e){
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
   if (state.view === 'train' && train.list.length){
-    if (e.code === 'Space'){ e.preventDefault(); if (!train.revealed){ train.revealed = true; renderTrain(); } else trainNext(); }
-    if (e.code === 'ArrowRight') trainNext();
-    if (e.code === 'ArrowLeft'){ train.revealed=false; if (train.i>0){ train.i--; renderTrain(); } }
+    if (e.code === 'Space' || e.code === 'ArrowRight'){ e.preventDefault(); trainNext(); }
+    if (e.code === 'ArrowLeft' && train.i>0){ train.i--; renderTrain(); }
   } else if (state.view === 'detail') {
     if (e.code === 'ArrowLeft') handleAct({getAttribute:function(){return 'prev';}}, null);
     if (e.code === 'ArrowRight') handleAct({getAttribute:function(){return 'next';}}, null);
