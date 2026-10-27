@@ -557,15 +557,15 @@ function renderList(){
 /* ----------------------------- detail view ----------------------------- */
 function renderDetail(){
   var it = state.cur;
-  if (!it){ state.view='list'; renderList(); return; }
+  if (!it){ state.cur=null; state.view = (state.from==='train') ? 'train' : 'list'; renderAll(); return; }
   recompute();
   var idx = state.filtered.indexOf(it);
-  if (idx === -1){ it = null; state.view='list'; renderList(); return; }
+  if (idx === -1){ it = null; state.cur=null; state.view = (state.from==='train') ? 'train' : 'list'; renderAll(); return; }
   var prev = idx>0 ? state.filtered[idx-1] : null;
   var next = idx<state.filtered.length-1 ? state.filtered[idx+1] : null;
   var src = SRC[it.src];
   var html = '<div class="dtopbar">'
-      + '<button class="back" data-act="back">← к списку</button>'
+      + '<button class="back" data-act="back">'+(state.from==='train'?'← к тренировке':'← к списку')+'</button>'
       + '<button class="dhide" data-act="hide" data-id="'+it.id+'" title="'+(state.hiddenOnly?'Вернуть в списки':'Скрыть вопрос')+'">'+(state.hiddenOnly?'👁 вернуть в списки':'🙈 скрыть')+'</button>'
       + '<span class="pcount">'+(idx+1)+' из '+state.filtered.length+'</span>'
       + (prev ? '<button class="dnav" data-act="open" data-id="'+prev.id+'" title="'+esc(prev.q)+'">← '+esc(cut(prev.q,44))+'</button>' : '<span class="dnav-sp"></span>')
@@ -592,6 +592,10 @@ function trainStart(){
   train.list = learnOrder(state.filtered);
 }
 function renderTrain(){
+  var keep = {}; state.filtered.forEach(function(q){ keep[q.id]=1; });
+  train.list = (train.list||[]).filter(function(it){ return keep[it.id]; });
+  var have = {}; train.list.forEach(function(it){ have[it.id]=1; });
+  state.filtered.forEach(function(q){ if (!have[q.id]) train.list.push(q); });
   var list = train.list;
   var nh = 0; QS.forEach(function(it){ if (hidden[it.id]) nh++; });
   var total = state.hiddenOnly ? nh : (QS.length - nh);
@@ -622,7 +626,7 @@ function learnOrder(list, rnd){
 
 /* ----------------------------- actions ----------------------------- */
 function refreshPool(){
-  if (state.view==='train') trainStart();
+  if (state.view==='train') recompute(); // порядок колоды сохраняем: скрытые уберёт renderTrain
 }
 
 function handleAct(el, ev){
@@ -712,6 +716,8 @@ function setView(v){
 }
 
 function renderAll(){
+  $('#mode-list').classList.toggle('on', state.view==='list' || state.view==='detail');
+  $('#mode-train').classList.toggle('on', state.view==='train');
   renderSidebar();
   recompute();
   if (state.view==='train') renderTrain();
