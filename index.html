@@ -557,10 +557,10 @@ function renderList(){
 /* ----------------------------- detail view ----------------------------- */
 function renderDetail(){
   var it = state.cur;
-  if (!it){ state.cur=null; state.view = (state.from==='train') ? 'train' : 'list'; renderAll(); return; }
+  if (!it){ state.cur=null; state.view = (state.from==='train') ? 'train' : 'list'; if (state.view==='train') trainStart(); renderAll(); return; }
   recompute();
   var idx = state.filtered.indexOf(it);
-  if (idx === -1){ it = null; state.cur=null; state.view = (state.from==='train') ? 'train' : 'list'; renderAll(); return; }
+  if (idx === -1){ it = null; state.cur=null; state.view = (state.from==='train') ? 'train' : 'list'; if (state.view==='train') trainStart(); renderAll(); return; }
   var prev = idx>0 ? state.filtered[idx-1] : null;
   var next = idx<state.filtered.length-1 ? state.filtered[idx+1] : null;
   var src = SRC[it.src];
@@ -680,7 +680,11 @@ function handleAct(el, ev){
       if (state.view !== 'detail') state.from = state.view;
       state.cur = QS.filter(function(q){ return q.id === +id; })[0];
       state.view = 'detail'; renderAll(); break;
-    case 'back': state.view = (state.from==='train') ? 'train' : 'list'; state.cur=null; renderAll(); break;
+    case 'back':
+      state.view = (state.from==='train') ? 'train' : 'list';
+      state.cur = null;
+      if (state.view==='train') trainStart(); // вернулись из вопроса — пересобираем колоду с учётом просмотров
+      renderAll(); break;
     case 'prev': case 'next': {
       recompute();
       var idx = state.filtered.indexOf(state.cur);
