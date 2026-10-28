@@ -587,7 +587,7 @@ function renderDetail(){
   var next = idx<state.filtered.length-1 ? state.filtered[idx+1] : null;
   var src = SRC[it.src];
   var html = '<div class="dtopbar">'
-      + '<button class="back" data-act="back">'+(state.from==='train'?'← к тренировке':'← к списку')+'</button>'
+      + '<button class="back" data-act="back">← к списку</button>'
       + '<button class="dhide" data-act="hide" data-id="'+it.id+'" title="'+(state.hiddenOnly?'Вернуть в списки':'Скрыть вопрос')+'">'+(state.hiddenOnly?'👁 вернуть в списки':'🙈 скрыть')+'</button>'
       + '<span class="pcount">'+(idx+1)+' из '+state.filtered.length+'</span>'
       + (prev ? '<button class="dnav" data-act="open" data-id="'+prev.id+'" title="'+esc(prev.q)+'">← '+esc(cut(prev.q,44))+'</button>' : '<span class="dnav-sp"></span>')
