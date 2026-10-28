@@ -34,7 +34,15 @@ header{position:sticky;top:0;z-index:20;display:flex;gap:10px;align-items:center
 .modes button{height:38px;padding:0 16px;border-radius:10px;border:1px solid var(--border);
   background:var(--panel2);color:var(--muted);cursor:pointer;font-size:14px}
 .modes button.on{background:var(--accent);border-color:var(--accent);color:#fff}
-#theme{width:38px;height:38px;border-radius:10px;border:1px solid var(--border);background:var(--panel2);cursor:pointer}
+#theme,#sync{width:38px;height:38px;border-radius:10px;border:1px solid var(--border);background:var(--panel2);cursor:pointer}
+#sync{color:var(--text);font-size:16px;line-height:1;transition:color .15s}
+#sync.busy{color:var(--accent)}
+.toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,12px);z-index:60;
+  max-width:min(90vw,420px);padding:10px 16px;border-radius:10px;border:1px solid var(--border);
+  background:var(--panel);color:var(--text);font-size:13.5px;text-align:center;
+  box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;pointer-events:none;
+  transition:opacity .18s ease,transform .18s ease}
+.toast.show{opacity:1;transform:translate(-50%,0)}
 #filters{display:none;align-items:center;justify-content:center;width:38px;height:38px;border-radius:10px;
   border:1px solid var(--border);background:var(--panel2);color:var(--text);cursor:pointer;font-size:17px;flex:none}
 button,input{font-family:inherit;touch-action:manipulation}
@@ -186,6 +194,7 @@ kbd{font-family:inherit;font-size:11px;border:1px solid var(--border);border-bot
   <div class="modes">
     <button id="mode-list" class="on" title="Чтение">📖 <span>Чтение</span></button>
     <button id="mode-train" title="Тренировка">🎯 <span>Тренировка</span></button>
+    <button id="sync" title="Синхронизация">☁</button>
     <button id="theme" title="Светлая/тёмная тема">🌓</button>
   </div>
 </header>
@@ -221,6 +230,19 @@ var favs = store.get('qa.favs', {});
 var done = store.get('qa.done', {});
 var hidden = store.get('qa.hidden', {});
 var views = store.get('qa.views', {});
+var flagTimes = store.get('qa.flagTimes', { favs:{}, done:{}, hidden:{} });
+if (!flagTimes || typeof flagTimes !== 'object') flagTimes = { favs:{}, done:{}, hidden:{} };
+['favs','done','hidden'].forEach(function(k){ if (!flagTimes[k] || typeof flagTimes[k] !== 'object') flagTimes[k] = {}; });
+var DEVICE = store.get('qa.device', '');
+if (!DEVICE){
+  DEVICE = 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  store.set('qa.device', DEVICE);
+}
+var globalViews = store.get('qa.globalViews', null);
+if (!globalViews || typeof globalViews !== 'object'){
+  globalViews = {};
+  Object.keys(views).forEach(function(id){ var n = Number(views[id])||0; if (n>0) globalViews[id] = n; });
+}
 
 var state = {
   view: 'list',
@@ -619,7 +641,7 @@ function renderTrain(){
 function learnOrder(list, rnd){
   rnd = rnd || Math.random;
   return list.slice().map(function(it){
-    var w = 1 / (1 + (views[it.id]||0));
+    var w = 1 / (1 + (globalViews[it.id]||0));
     return { it: it, key: Math.pow(rnd(), 1/w) };
   }).sort(function(a,b){ return b.key - a.key; }).map(function(x){ return x.it; });
 }
@@ -627,6 +649,19 @@ function learnOrder(list, rnd){
 /* ----------------------------- actions ----------------------------- */
 function refreshPool(){
   if (state.view==='train') recompute(); // порядок колоды сохраняем: скрытые уберёт renderTrain
+}
+
+function setFlag(kind, id, on){
+  var map = kind==='favs' ? favs : kind==='done' ? done : hidden;
+  if (on) map[id] = 1; else delete map[id];
+  flagTimes[kind][id] = Date.now();
+  saveState();
+}
+function bumpView(id){
+  id = String(id);
+  views[id] = (views[id]||0) + 1;
+  globalViews[id] = (globalViews[id]||0) + 1;
+  saveState();
 }
 
 function handleAct(el, ev){
@@ -652,10 +687,10 @@ function handleAct(el, ev){
     case 'undone': state.undoneOnly = !state.undoneOnly; refreshPool(); renderAll(); break;
     case 'hiddenonly': state.hiddenOnly = !state.hiddenOnly; refreshPool(); renderAll(); break;
     case 'hide':
-      if (hidden[id]) delete hidden[id]; else hidden[id]=1;
-      saveState();
+      setFlag('hidden', id, !hidden[id]);
       refreshPool(); renderAll(); break;
     case 'unhide-all':
+      Object.keys(hidden).forEach(function(k){ flagTimes.hidden[k] = Date.now(); });
       hidden = {}; saveState();
       refreshPool();
       renderAll(); break;
@@ -670,13 +705,13 @@ function handleAct(el, ev){
       break;
     case 'chip': removeChip(id); renderAll(); break;
     case 'fav':
-      if (favs[id]) delete favs[id]; else favs[id]=1;
-      saveState(); renderAll(); break;
+      setFlag('favs', id, !favs[id]);
+      renderAll(); break;
     case 'done':
-      if (done[id]) delete done[id]; else done[id]=1;
-      saveState(); renderAll(); break;
+      setFlag('done', id, !done[id]);
+      renderAll(); break;
     case 'open':
-      views[id] = (views[id]||0) + 1; saveState();
+      bumpView(id);
       if (state.view !== 'detail') state.from = state.view;
       state.cur = QS.filter(function(q){ return q.id === +id; })[0];
       state.view = 'detail'; renderAll(); break;
@@ -707,21 +742,190 @@ function removeChip(k){
   refreshPool();
 }
 
-function saveState(){ store.set('qa.favs',favs); store.set('qa.done',done); store.set('qa.hidden',hidden); store.set('qa.views',views); }
+/* ----------------------------- sync ----------------------------- */
+var SYNC_URL = 'https://mantledb.sh/v2/mlq-sync-58f716457a/progress';
+var SYNC_KEY = '1162a83b616bbf943548722ffb965e6b2b9d33c783b3f9e7e2138f2487cba245';
+var syncState = { busy:false, queued:false, dirty:false, last:0, seq:0, timer:0, failures:0 };
+
+function persistLocal(){
+  store.set('qa.favs', favs); store.set('qa.done', done); store.set('qa.hidden', hidden);
+  store.set('qa.views', views); store.set('qa.globalViews', globalViews);
+  store.set('qa.flagTimes', flagTimes); store.set('qa.device', DEVICE);
+}
+function saveState(){
+  persistLocal();
+  syncState.dirty = true;
+  syncState.seq++;
+  scheduleSync(1200);
+}
+
+function syncIcon(icon, title, busy){
+  var b = document.getElementById('sync');
+  if (!b) return;
+  b.textContent = icon;
+  b.title = title || 'Синхронизация';
+  b.classList.toggle('busy', !!busy);
+}
+var toastEl = null, toastTimer = 0;
+function toast(msg){
+  if (!toastEl){
+    toastEl = document.createElement('div');
+    toastEl.className = 'toast';
+    document.body.appendChild(toastEl);
+  }
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ toastEl.classList.remove('show'); }, 2800);
+}
+function scheduleSync(delay){
+  if (syncState.timer) clearTimeout(syncState.timer);
+  syncState.timer = setTimeout(function(){ syncState.timer = 0; syncNow(false); }, delay==null ? 1200 : delay);
+}
+
+/* Облачные просмотры: {deviceId: {questionId: count}}. Сумма по устройствам. */
+function cloudBuckets(raw){
+  var out = {}, legacy = null;
+  Object.keys(raw||{}).forEach(function(k){
+    var v = raw[k];
+    if (v && typeof v === 'object'){
+      var m = {};
+      Object.keys(v).forEach(function(id){ var n = Number(v[id])||0; if (n>0) m[id] = n; });
+      out[k] = m;
+    } else if (typeof v === 'number' && v > 0){
+      legacy = legacy || {};
+      legacy[k] = v;
+    }
+  });
+  if (legacy) out.legacy = sumViews(out.legacy, legacy);
+  return out;
+}
+function sumViews(a, b){
+  var g = {};
+  [a,b].forEach(function(m){
+    Object.keys(m||{}).forEach(function(id){
+      var n = Number(m[id])||0;
+      if (n>0) g[id] = (g[id]||0) + n;
+    });
+  });
+  return g;
+}
+function sumBuckets(buckets){
+  var g = {};
+  Object.keys(buckets||{}).forEach(function(dev){ g = sumViews(g, buckets[dev]); });
+  return g;
+}
+
+/* Флаги сливаем по времени изменения; {v:0,t} — tombstone (снятие/возврат). */
+function mergeFlags(kind, cloudMap){
+  var localMap = kind==='favs' ? favs : kind==='done' ? done : hidden;
+  var times = flagTimes[kind];
+  var out = {}, ids = {};
+  Object.keys(localMap).forEach(function(id){ ids[id]=1; });
+  Object.keys(times).forEach(function(id){ ids[id]=1; });
+  Object.keys(cloudMap||{}).forEach(function(id){ ids[id]=1; });
+  Object.keys(ids).forEach(function(id){
+    var e = (cloudMap||{})[id], cv = 0, ct = 0;
+    if (typeof e === 'number') cv = e ? 1 : 0;
+    else if (e && typeof e === 'object'){ cv = e.v ? 1 : 0; ct = Number(e.t)||0; }
+    var lv = localMap[id] ? 1 : 0;
+    var lt = Number(times[id])||0;
+    var v, t;
+    if (lt > ct){ v = lv; t = lt; }
+    else if (ct > lt){ v = cv; t = ct; }
+    else { v = (lv || cv) ? 1 : 0; t = lt; }
+    if (v) localMap[id] = 1; else delete localMap[id];
+    if (t || v) times[id] = t; else delete times[id];
+    out[id] = { v: v, t: t };
+  });
+  return out;
+}
+
+function syncNow(manual){
+  if (!manual && !syncState.dirty && syncState.last && (Date.now() - syncState.last) < 30000) return;
+  if (syncState.busy){ syncState.queued = true; return; }
+  if (syncState.timer){ clearTimeout(syncState.timer); syncState.timer = 0; }
+  syncState.busy = true;
+  syncIcon('⟳', 'Синхронизация…', true);
+  var startedSeq = syncState.seq;
+  var ctrl = window.AbortController ? new AbortController() : null;
+  var abortTimer = setTimeout(function(){ if (ctrl) ctrl.abort(); }, 20000);
+  var signal = ctrl ? ctrl.signal : undefined;
+
+  fetch(SYNC_URL, { headers: { 'X-Mantle-Key': SYNC_KEY }, cache: 'no-store', signal: signal })
+    .then(function(r){
+      if (r.status === 404) return {};
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function(cloud){
+      cloud = (cloud && typeof cloud === 'object') ? cloud : {};
+      var buckets = cloudBuckets(cloud.views);
+      buckets[DEVICE] = sumViews(null, views);
+      var doc = {
+        schema: 2,
+        savedAt: Date.now(),
+        views: buckets,
+        favs: mergeFlags('favs', cloud.favs),
+        done: mergeFlags('done', cloud.done),
+        hidden: mergeFlags('hidden', cloud.hidden)
+      };
+      globalViews = sumBuckets(buckets);
+      persistLocal();
+      return fetch(SYNC_URL, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'X-Mantle-Key': SYNC_KEY },
+        body: JSON.stringify(doc),
+        cache: 'no-store',
+        signal: signal
+      });
+    })
+    .then(function(r){
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      syncState.last = Date.now();
+      syncState.failures = 0;
+      syncState.dirty = syncState.seq !== startedSeq;
+      if (syncState.dirty){
+        syncIcon('☁', 'Есть несинхронизированные изменения', true);
+        scheduleSync(700);
+      } else {
+        syncIcon('✓', 'Синхронизировано');
+      }
+      if (manual) toast(syncState.dirty ? 'Синхронизировано, есть новые изменения…' : 'Синхронизировано');
+      if (state.view === 'list') renderAll(); else renderSidebar();
+    })
+    .catch(function(){
+      syncState.dirty = true;
+      syncState.failures = (syncState.failures || 0) + 1;
+      syncIcon('⚠', 'Не удалось синхронизироваться — прогресс сохранён локально', false);
+      if (manual) toast('Не удалось синхронизироваться. Прогресс сохранён локально.');
+      if (syncState.failures <= 2 && navigator.onLine) scheduleSync(8000 * syncState.failures);
+    })
+    .then(function(){
+      clearTimeout(abortTimer);
+      syncState.busy = false;
+      if (syncState.queued){ syncState.queued = false; scheduleSync(300); }
+    }, function(){
+      clearTimeout(abortTimer);
+      syncState.busy = false;
+    });
+}
 
 /* ----------------------------- views ----------------------------- */
 function setView(v){
   state.view = v;
-  $('#mode-list').classList.toggle('on', v==='list' || v==='detail');
-  $('#mode-train').classList.toggle('on', v==='train');
+  var mode = (v==='detail') ? state.from : v;
+  $('#mode-list').classList.toggle('on', mode!=='train');
+  $('#mode-train').classList.toggle('on', mode==='train');
   if (v==='train') trainStart();
   store.set('qa.mode', v);
   renderAll();
 }
 
 function renderAll(){
-  $('#mode-list').classList.toggle('on', state.view==='list' || state.view==='detail');
-  $('#mode-train').classList.toggle('on', state.view==='train');
+  var mode = (state.view==='detail') ? state.from : state.view;
+  $('#mode-list').classList.toggle('on', mode!=='train');
+  $('#mode-train').classList.toggle('on', mode==='train');
   renderSidebar();
   recompute();
   if (state.view==='train') renderTrain();
@@ -781,7 +985,7 @@ document.getElementById('main').addEventListener('click', function(e){
   if (t){ handleAct(t, e); return; }
   var card = e.target.closest('.card[data-id]');
   if (card){
-    views[card.dataset.id] = (views[card.dataset.id]||0) + 1; saveState();
+    bumpView(card.dataset.id);
     state.from = state.view;
     state.cur = QS.filter(function(q){ return q.id === +card.dataset.id; })[0];
     state.view = 'detail'; renderAll();
@@ -806,6 +1010,21 @@ if (window.addEventListener) window.addEventListener('resize', syncStickyTop);
 var savedMode = store.get('qa.mode', 'list');
 if (['list','train'].indexOf(savedMode) < 0) savedMode = 'list';
 setView(savedMode);
+
+syncIcon('☁', 'Синхронизация');
+var syncBtn = document.getElementById('sync');
+if (syncBtn) syncBtn.addEventListener('click', function(){
+  if (syncState.busy){ toast('Синхронизация уже идёт…'); return; }
+  syncNow(true);
+});
+document.addEventListener('visibilitychange', function(){
+  if (document.visibilityState === 'visible') scheduleSync(900);
+});
+window.addEventListener('focus', function(){
+  if (document.visibilityState === 'visible') scheduleSync(900);
+});
+window.addEventListener('online', function(){ scheduleSync(900); });
+setTimeout(function(){ syncNow(false); }, 700);
 
 </script>
 </body>
