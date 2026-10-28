@@ -841,6 +841,26 @@ function mergeFlags(kind, cloudMap){
   return out;
 }
 
+/* fetch с жёстким таймаутом: некоторые браузеры не будит AbortController,
+   поэтому гоняем запрос с таймером и игнорируем поздний ответ. */
+function fetchT(url, opts, ms){
+  return new Promise(function(resolve, reject){
+    var done = false;
+    var timer = setTimeout(function(){ if (done) return; done = true; reject(new Error('timeout')); }, ms);
+    opts = opts || {};
+    var ctrl = (window.AbortController && !opts.signal) ? new AbortController() : null;
+    if (ctrl) opts.signal = ctrl.signal;
+    var abort = setTimeout(function(){ if (ctrl) { try { ctrl.abort(); } catch(e){} } }, ms);
+    function finish(fn, val){
+      if (done) return;
+      done = true;
+      clearTimeout(timer); clearTimeout(abort);
+      fn(val);
+    }
+    fetch(url, opts).then(function(r){ finish(resolve, r); }, function(e){ finish(reject, e); });
+  });
+}
+
 function syncNow(manual){
   if (!manual && !syncState.dirty && syncState.last && (Date.now() - syncState.last) < 30000) return;
   if (syncState.busy){ syncState.queued = true; return; }
@@ -848,11 +868,8 @@ function syncNow(manual){
   syncState.busy = true;
   syncIcon('⟳', 'Синхронизация…', true);
   var startedSeq = syncState.seq;
-  var ctrl = window.AbortController ? new AbortController() : null;
-  var abortTimer = setTimeout(function(){ if (ctrl) ctrl.abort(); }, 20000);
-  var signal = ctrl ? ctrl.signal : undefined;
 
-  fetch(SYNC_URL, { headers: { 'X-Mantle-Key': SYNC_KEY }, cache: 'no-store', signal: signal })
+  fetchT(SYNC_URL, { headers: { 'X-Mantle-Key': SYNC_KEY }, cache: 'no-store' }, 20000)
     .then(function(r){
       if (r.status === 404) return {};
       if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -872,13 +889,12 @@ function syncNow(manual){
       };
       globalViews = sumBuckets(buckets);
       persistLocal();
-      return fetch(SYNC_URL, {
+      return fetchT(SYNC_URL, {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'X-Mantle-Key': SYNC_KEY },
         body: JSON.stringify(doc),
-        cache: 'no-store',
-        signal: signal
-      });
+        cache: 'no-store'
+      }, 20000);
     })
     .then(function(r){
       if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -902,11 +918,9 @@ function syncNow(manual){
       if (syncState.failures <= 2 && navigator.onLine) scheduleSync(8000 * syncState.failures);
     })
     .then(function(){
-      clearTimeout(abortTimer);
       syncState.busy = false;
       if (syncState.queued){ syncState.queued = false; scheduleSync(300); }
     }, function(){
-      clearTimeout(abortTimer);
       syncState.busy = false;
     });
 }
