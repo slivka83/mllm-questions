@@ -219,6 +219,8 @@ kbd{font-family:inherit;font-size:11px;border:1px solid var(--border);border-bot
 'use strict';
 var DATA = JSON.parse(document.getElementById('qa-data').textContent);
 var QS = DATA.questions;
+var QNUM = {};
+QS.forEach(function(q, i){ QNUM[q.id] = i + 1; });
 var SRC = {};
 DATA.sources.forEach(function(s){ SRC[s.id] = s; });
 
@@ -555,7 +557,7 @@ function cardHtml(it){
   var hd = state.hiddenOnly;
   var head = '<div class="chead">'
       + '<span class="badge" title="'+esc(src.title)+'">'+esc(src.short)+'</span>'
-      + (it.num?'<span class="chip">#'+esc(it.num)+'</span>':'')
+      + '<span class="chip">#'+QNUM[it.id]+'</span>'
       + tagsChips(it.tags)
       + (it.icon?'<span>'+it.icon+'</span>':'')
       + (done[it.id]?'<span class="chip donec">✓ изучено</span>':'')
@@ -614,7 +616,7 @@ function renderDetail(){
       + '<article class="detail">'
       + '<div class="chead">'
       + '<span class="badge" title="'+esc(src.title)+'">'+esc(src.short)+'</span>'
-      + (it.num?'<span class="chip">#'+esc(it.num)+'</span>':'')
+      + '<span class="chip">#'+QNUM[it.id]+'</span>'
       + tagsChips(it.tags)
       + (it.icon?'<span>'+it.icon+'</span>':'')
       + '</div>'
