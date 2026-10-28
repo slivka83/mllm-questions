@@ -1025,6 +1025,10 @@ window.addEventListener('focus', function(){
 });
 window.addEventListener('online', function(){ scheduleSync(900); });
 setTimeout(function(){ syncNow(false); }, 700);
+/* Долгие/нестабильные сети: пока есть несинхронизированные изменения, пробуем снова. */
+setInterval(function(){
+  if (syncState.dirty && !syncState.busy && !syncState.timer) syncNow(false);
+}, 45000);
 
 </script>
 </body>
