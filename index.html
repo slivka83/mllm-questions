@@ -606,6 +606,14 @@ function renderDetail(){
   var it = state.cur;
   if (!it){ state.cur=null; state.view = (state.from==='train') ? 'train' : 'list'; if (state.view==='train') trainStart(); renderAll(); return; }
   recompute();
+  // вопрос скрыли (или он выпал из фильтра) — уходим из карточки
+  if (state.filtered.indexOf(it) === -1){
+    state.cur = null;
+    state.view = (state.from==='train') ? 'train' : 'list';
+    if (state.view==='train') trainStart();
+    renderAll();
+    return;
+  }
   var pool = navPool();
   var idx = pool.indexOf(it);
   if (idx === -1){ pool = state.filtered; idx = pool.indexOf(it); }
