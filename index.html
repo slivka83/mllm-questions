@@ -39,8 +39,8 @@ header{position:sticky;top:0;z-index:20;display:flex;gap:10px;align-items:center
 .modes button{height:38px;padding:0 16px;border-radius:10px;border:1px solid var(--border);
   background:var(--panel2);color:var(--muted);cursor:pointer;font-size:14px}
 .modes button.on{background:var(--accent);border-color:var(--accent);color:#fff}
-#theme,#sync{width:38px;height:38px;border-radius:10px;border:1px solid var(--border);background:var(--panel2);cursor:pointer}
-#sync{color:var(--text);font-size:16px;line-height:1;transition:color .15s}
+#theme,#sync,#stats{width:38px;height:38px;border-radius:10px;border:1px solid var(--border);background:var(--panel2);cursor:pointer}
+#sync,#stats{color:var(--text);font-size:16px;line-height:1;transition:color .15s}
 #sync.busy{color:var(--accent)}
 .toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,12px);z-index:60;
   max-width:min(90vw,420px);padding:10px 16px;border-radius:10px;border:1px solid var(--border);
@@ -48,6 +48,32 @@ header{position:sticky;top:0;z-index:20;display:flex;gap:10px;align-items:center
   box-shadow:0 8px 24px rgba(0,0,0,.2);opacity:0;pointer-events:none;
   transition:opacity .18s ease,transform .18s ease}
 .toast.show{opacity:1;transform:translate(-50%,0)}
+.stats-modal{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;
+  padding:16px;background:rgba(10,14,22,.45)}
+.stats-modal.open{display:flex}
+.stats-box{width:min(520px,100%);max-height:min(82vh,760px);display:flex;flex-direction:column;
+  overflow:hidden;background:var(--panel);color:var(--text);border:1px solid var(--border);
+  border-radius:16px;box-shadow:0 18px 50px rgba(0,0,0,.28)}
+.stats-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border)}
+.stats-title{font-size:15px;font-weight:700}
+.stats-close{margin-left:auto;width:32px;height:32px;border-radius:9px;border:1px solid var(--border);
+  background:var(--panel2);color:var(--text);cursor:pointer;font-size:15px}
+.stats-close:hover{border-color:var(--accent)}
+.stats-body{padding:14px 16px 16px;overflow:auto}
+.stats-sum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.stats-kpi{padding:9px 10px;border-radius:10px;background:var(--panel2);border:1px solid var(--border)}
+.stats-kpi .n{font-size:22px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+.stats-kpi .l{margin-top:2px;font-size:10.5px;letter-spacing:.03em;text-transform:uppercase;color:var(--muted)}
+.stats-list{display:flex;flex-direction:column;gap:5px}
+.stats-row{display:grid;grid-template-columns:92px minmax(0,1fr) 36px;gap:8px;align-items:center;font-size:12.5px}
+.stats-date{color:var(--muted);white-space:nowrap}
+.stats-track{height:8px;border-radius:999px;background:var(--panel2);border:1px solid var(--border);overflow:hidden}
+.stats-fill{height:100%;border-radius:999px;background:var(--accent)}
+.stats-n{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+.stats-n.zero{color:var(--muted);font-weight:400}
+.stats-empty{padding:28px 8px;text-align:center;color:var(--muted);font-size:13.5px;line-height:1.6}
+.stats-note{margin-top:12px;color:var(--muted);font-size:11.5px;text-align:center}
+body.stats-open{overflow:hidden}
 #filters{display:none;align-items:center;justify-content:center;width:38px;height:38px;border-radius:10px;
   border:1px solid var(--border);background:var(--panel2);color:var(--text);cursor:pointer;font-size:17px;flex:none}
 button,input{font-family:inherit;touch-action:manipulation}
@@ -182,7 +208,11 @@ kbd{font-family:inherit;font-size:11px;border:1px solid var(--border);border-bot
 @media (max-width:560px){
   .modes button span{display:none}
   .modes button{padding:0 11px}
-  .brand{max-width:150px}
+  .brand{max-width:110px}
+  .stats-box{max-height:86vh}
+  .stats-sum{gap:6px}
+  .stats-kpi .n{font-size:19px}
+  .stats-row{grid-template-columns:86px minmax(0,1fr) 32px;font-size:12px}
 }
 @media (hover:none){
   .card:hover{transform:none;border-color:var(--border)}
@@ -200,11 +230,21 @@ kbd{font-family:inherit;font-size:11px;border:1px solid var(--border);border-bot
   <div class="modes">
     <button id="mode-list" class="on" title="Чтение">📖 <span>Чтение</span></button>
     <button id="mode-train" title="Тренировка">🎯 <span>Тренировка</span></button>
+    <button id="stats" title="Статистика просмотров" aria-label="Статистика просмотров">📊</button>
     <button id="sync" title="Синхронизация">☁</button>
     <button id="theme" title="Светлая/тёмная тема">🌓</button>
   </div>
 </header>
 <div id="backdrop"></div>
+<div id="stats-modal" class="stats-modal" aria-hidden="true">
+  <div class="stats-box" role="dialog" aria-modal="true" aria-labelledby="stats-title">
+    <div class="stats-head">
+      <div class="stats-title" id="stats-title">📊 Статистика просмотров</div>
+      <button id="stats-close" class="stats-close" type="button" title="Закрыть" aria-label="Закрыть">✕</button>
+    </div>
+    <div class="stats-body" id="stats-body"></div>
+  </div>
+</div>
 <div class="layout">
   <aside id="sidebar"></aside>
   <main id="main" style="min-width:0"><div id="viewroot"></div></main>
@@ -238,6 +278,8 @@ var favs = store.get('qa.favs', {});
 var done = store.get('qa.done', {});
 var hidden = store.get('qa.hidden', {});
 var views = store.get('qa.views', {});
+var daily = store.get('qa.daily', {});
+if (!daily || typeof daily !== 'object' || Array.isArray(daily)) daily = {};
 var flagTimes = store.get('qa.flagTimes', { favs:{}, done:{}, hidden:{} });
 if (!flagTimes || typeof flagTimes !== 'object') flagTimes = { favs:{}, done:{}, hidden:{} };
 ['favs','done','hidden'].forEach(function(k){ if (!flagTimes[k] || typeof flagTimes[k] !== 'object') flagTimes[k] = {}; });
@@ -914,10 +956,86 @@ function setFlag(kind, id, on){
   flagTimes[kind][id] = Date.now();
   saveState();
 }
+function pad2(n){ return n < 10 ? '0' + n : '' + n; }
+function dayKey(d){
+  d = d || new Date();
+  return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate());
+}
+function dayKeyOffset(offset){
+  var d = new Date();
+  d.setHours(12, 0, 0, 0);
+  d.setDate(d.getDate() + offset);
+  return dayKey(d);
+}
+function dailyCount(k){
+  var m = daily[k];
+  return (m && typeof m === 'object' && !Array.isArray(m)) ? Object.keys(m).length : 0;
+}
+function markDaily(id){
+  var k = dayKey();
+  var m = daily[k];
+  if (!m || typeof m !== 'object' || Array.isArray(m)) m = daily[k] = {};
+  m[String(id)] = 1;
+}
+function sumDaily(from, to){
+  var total = 0;
+  Object.keys(daily).forEach(function(k){
+    if (k >= from && k <= to) total += dailyCount(k);
+  });
+  return total;
+}
+function fmtDay(k){
+  var p = k.split('-');
+  var d = new Date(+p[0], +p[1]-1, +p[2], 12);
+  var wd = ['вс','пн','вт','ср','чт','пт','сб'][d.getDay()];
+  var suffix = (+p[0] === new Date().getFullYear()) ? '' : '.' + String(p[0]).slice(2);
+  return pad2(d.getDate()) + '.' + pad2(d.getMonth()+1) + suffix + ' · ' + wd;
+}
+function renderStats(){
+  var today = dayKey();
+  var keys = Object.keys(daily).filter(function(k){ return dailyCount(k) > 0; }).sort().reverse();
+  var max = 1;
+  keys.forEach(function(k){ var n = dailyCount(k); if (n > max) max = n; });
+  var sum7 = sumDaily(dayKeyOffset(-6), today);
+  var sum30 = sumDaily(dayKeyOffset(-29), today);
+  var html = '<div class="stats-sum">'
+      + '<div class="stats-kpi"><div class="n">' + dailyCount(today) + '</div><div class="l">Сегодня</div></div>'
+      + '<div class="stats-kpi"><div class="n">' + sum7 + '</div><div class="l">7 дней</div></div>'
+      + '<div class="stats-kpi"><div class="n">' + sum30 + '</div><div class="l">30 дней</div></div>'
+      + '</div>';
+  if (!keys.length){
+    html += '<div class="stats-empty">Пока нет просмотров.<br>Открой любой вопрос — статистика начнёт собираться.</div>';
+  } else {
+    html += '<div class="stats-list">';
+    keys.forEach(function(k){
+      var n = dailyCount(k), w = n ? Math.max(4, Math.round(n / max * 100)) : 0;
+      html += '<div class="stats-row"><div class="stats-date">' + fmtDay(k) + '</div>'
+           +  '<div class="stats-track"><div class="stats-fill" style="width:' + w + '%"></div></div>'
+           +  '<div class="stats-n' + (n ? '' : ' zero') + '">' + n + '</div></div>';
+    });
+    html += '</div><div class="stats-note">За день каждый вопрос считается один раз.</div>';
+  }
+  $('#stats-body').innerHTML = html;
+}
+function openStats(){
+  renderStats();
+  var m = $('#stats-modal');
+  m.classList.add('open');
+  m.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('stats-open');
+}
+function closeStats(){
+  var m = $('#stats-modal');
+  if (!m) return;
+  m.classList.remove('open');
+  m.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('stats-open');
+}
 function bumpView(id){
   id = String(id);
   views[id] = (views[id]||0) + 1;
   globalViews[id] = (globalViews[id]||0) + 1;
+  markDaily(id);
   saveState();
 }
 
@@ -974,8 +1092,10 @@ function handleAct(el, ev){
       var pool = navPool();
       var idx = pool.indexOf(state.cur);
       if (idx === -1){ pool = state.filtered; idx = pool.indexOf(state.cur); }
+      var before = state.cur;
       if (act==='prev' && idx>0) state.cur = pool[idx-1];
       if (act==='next' && idx > -1 && idx < pool.length-1) state.cur = pool[idx+1];
+      if (state.cur && state.cur !== before) bumpView(state.cur.id);
       renderAll(); break;
     }
   }
@@ -999,6 +1119,7 @@ var syncState = { busy:false, queued:false, dirty:false, last:0, seq:0, timer:0,
 function persistLocal(){
   store.set('qa.favs', favs); store.set('qa.done', done); store.set('qa.hidden', hidden);
   store.set('qa.views', views); store.set('qa.globalViews', globalViews);
+  store.set('qa.daily', daily);
   store.set('qa.flagTimes', flagTimes); store.set('qa.device', DEVICE);
 }
 function saveState(){
@@ -1063,6 +1184,22 @@ function sumBuckets(buckets){
   var g = {};
   Object.keys(buckets||{}).forEach(function(dev){ g = sumViews(g, buckets[dev]); });
   return g;
+}
+
+/* Ежедневные просмотры: {date: {questionId:1}}, объединяем по датам. */
+function mergeDaily(cloudDaily){
+  var out = {};
+  [daily, cloudDaily].forEach(function(src){
+    if (!src || typeof src !== 'object' || Array.isArray(src)) return;
+    Object.keys(src).forEach(function(day){
+      var m = src[day];
+      if (!m || typeof m !== 'object' || Array.isArray(m)) return;
+      var dst = out[day] || (out[day] = {});
+      Object.keys(m).forEach(function(id){ if (m[id]) dst[id] = 1; });
+    });
+  });
+  daily = out;
+  return out;
 }
 
 /* Флаги сливаем по времени изменения; {v:0,t} — tombstone (снятие/возврат). */
@@ -1134,7 +1271,8 @@ function syncNow(manual){
         views: buckets,
         favs: mergeFlags('favs', cloud.favs),
         done: mergeFlags('done', cloud.done),
-        hidden: mergeFlags('hidden', cloud.hidden)
+        hidden: mergeFlags('hidden', cloud.hidden),
+        daily: mergeDaily(cloud.daily)
       };
       globalViews = sumBuckets(buckets);
       persistLocal();
@@ -1158,6 +1296,7 @@ function syncNow(manual){
       }
       if (manual) toast(syncState.dirty ? 'Синхронизировано, есть новые изменения…' : 'Синхронизировано');
       if (state.view === 'list') renderAll(); else renderSidebar();
+      if ($('#stats-modal').classList.contains('open')) renderStats();
     })
     .catch(function(){
       syncState.dirty = true;
@@ -1230,6 +1369,9 @@ $('#theme').addEventListener('click', function(){
   store.set('qa.theme', t);
   setThemeColor(t);
 });
+$('#stats').addEventListener('click', openStats);
+$('#stats-close').addEventListener('click', closeStats);
+$('#stats-modal').addEventListener('click', function(e){ if (e.target === this) closeStats(); });
 $('#filters').addEventListener('click', function(){
   document.body.classList.toggle('filters-open');
   syncFilterBtn();
@@ -1259,6 +1401,7 @@ document.getElementById('main').addEventListener('keydown', function(e){
 });
 
 document.addEventListener('keydown', function(e){
+  if (e.key === 'Escape' && document.body.classList.contains('stats-open')){ closeStats(); return; }
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
   if (state.view === 'detail') {
     if (e.code === 'ArrowLeft') handleAct({getAttribute:function(){return 'prev';}}, null);
