@@ -993,9 +993,7 @@ function fmtDay(k){
 }
 function renderStats(){
   var today = dayKey();
-  var keys = Object.keys(daily).filter(function(k){ return dailyCount(k) > 0; }).sort().reverse();
-  var max = 1;
-  keys.forEach(function(k){ var n = dailyCount(k); if (n > max) max = n; });
+  var active = Object.keys(daily).filter(function(k){ return k <= today && dailyCount(k) > 0; }).sort();
   var sum7 = sumDaily(dayKeyOffset(-6), today);
   var sum30 = sumDaily(dayKeyOffset(-29), today);
   var html = '<div class="stats-sum">'
@@ -1003,18 +1001,33 @@ function renderStats(){
       + '<div class="stats-kpi"><div class="n">' + sum7 + '</div><div class="l">7 дней</div></div>'
       + '<div class="stats-kpi"><div class="n">' + sum30 + '</div><div class="l">30 дней</div></div>'
       + '</div>';
-  if (!keys.length){
+  if (!active.length){
     html += '<div class="stats-empty">Пока нет просмотров.<br>Открой любой вопрос — статистика начнёт собираться.</div>';
-  } else {
-    html += '<div class="stats-list">';
-    keys.forEach(function(k){
-      var n = dailyCount(k), w = n ? Math.max(4, Math.round(n / max * 100)) : 0;
-      html += '<div class="stats-row"><div class="stats-date">' + fmtDay(k) + '</div>'
-           +  '<div class="stats-track"><div class="stats-fill" style="width:' + w + '%"></div></div>'
-           +  '<div class="stats-n' + (n ? '' : ' zero') + '">' + n + '</div></div>';
-    });
-    html += '</div><div class="stats-note">За день каждый вопрос считается один раз.</div>';
+    $('#stats-body').innerHTML = html;
+    return;
   }
+  var start = active[0];
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || start > today) start = today;
+  var keys = [], d = new Date();
+  d.setHours(12, 0, 0, 0);
+  var guard = 0;
+  while (guard++ < 3660){
+    var k = dayKey(d);
+    if (k < start) break;
+    keys.push(k);
+    d.setDate(d.getDate() - 1);
+  }
+  if (!keys.length) keys = [today];
+  var max = 1;
+  keys.forEach(function(k){ var n = dailyCount(k); if (n > max) max = n; });
+  html += '<div class="stats-list">';
+  keys.forEach(function(k){
+    var n = dailyCount(k), w = n ? Math.max(4, Math.round(n / max * 100)) : 0;
+    html += '<div class="stats-row"><div class="stats-date">' + fmtDay(k) + '</div>'
+         +  '<div class="stats-track"><div class="stats-fill" style="width:' + w + '%"></div></div>'
+         +  '<div class="stats-n' + (n ? '' : ' zero') + '">' + n + '</div></div>';
+  });
+  html += '</div><div class="stats-note">За день каждый вопрос считается один раз.</div>';
   $('#stats-body').innerHTML = html;
 }
 function openStats(){
