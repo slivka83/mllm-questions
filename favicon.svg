@@ -14,5 +14,5 @@
     <rect width="512" height="512" fill="url(#g)"/>
     <rect width="512" height="300" fill="url(#hl)"/>
   </g>
-  <g fill="#ffffff" transform="translate(61.21 337.84) scale(0.112305 -0.112305)"><path transform="translate(0 0)" d="M188 1493H678L1018 694L1360 1493H1849V0H1485V1092L1141 287H897L553 1092V0H188Z"/> <path transform="translate(2032 0)" d="M188 1493H573V291H1249V0H188Z"/></g>
+  <g fill="#ffffff" transform="translate(215.75 349.19) scale(0.175781 -0.175781)"><path transform="translate(0 0)" d="M188 1493H573V145Q573 -134 421.5 -272.0Q270 -410 -37 -410H-115V-119H-55Q65 -119 126.5 -52.0Q188 15 188 145Z"/></g>
 </svg>
