@@ -1335,6 +1335,7 @@ function removeChip(k){
 
 /* ----------------------------- sync ----------------------------- */
 var SYNC_URL = 'https://mantledb.sh/v2/mlq-sync-58f716457a/progress';
+var SYNC_ANSWERS_URL = 'https://mantledb.sh/v2/mlq-sync-58f716457a/answers';
 var SYNC_KEY = '1162a83b616bbf943548722ffb965e6b2b9d33c783b3f9e7e2138f2487cba245';
 var syncState = { busy:false, queued:false, dirty:false, last:0, seq:0, timer:0, failures:0 };
 
@@ -1492,6 +1493,26 @@ function fetchT(url, opts, ms){
   });
 }
 
+function getSyncDoc(url){
+  return fetchT(url, { headers: { 'X-Mantle-Key': SYNC_KEY }, cache: 'no-store' }, 20000)
+    .then(function(r){
+      if (r.status === 404) return {};
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+}
+function postSyncDoc(url, doc){
+  return fetchT(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'X-Mantle-Key': SYNC_KEY },
+    body: JSON.stringify(doc),
+    cache: 'no-store'
+  }, 20000).then(function(r){
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r;
+  });
+}
+
 function syncNow(manual){
   if (!manual && !syncState.dirty && syncState.last && (Date.now() - syncState.last) < 30000) return;
   if (syncState.busy){ syncState.queued = true; return; }
@@ -1500,14 +1521,10 @@ function syncNow(manual){
   syncIcon('⟳', 'Синхронизация…', true);
   var startedSeq = syncState.seq;
 
-  fetchT(SYNC_URL, { headers: { 'X-Mantle-Key': SYNC_KEY }, cache: 'no-store' }, 20000)
-    .then(function(r){
-      if (r.status === 404) return {};
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
-    })
-    .then(function(cloud){
-      cloud = (cloud && typeof cloud === 'object') ? cloud : {};
+  Promise.all([getSyncDoc(SYNC_URL), getSyncDoc(SYNC_ANSWERS_URL)])
+    .then(function(docs){
+      var cloud = (docs[0] && typeof docs[0] === 'object') ? docs[0] : {};
+      var ansCloud = (docs[1] && typeof docs[1] === 'object') ? docs[1] : {};
       var buckets = cloudBuckets(cloud.views);
       buckets[DEVICE] = sumViews(null, views);
       var doc = {
@@ -1517,20 +1534,22 @@ function syncNow(manual){
         favs: mergeFlags('favs', cloud.favs),
         done: mergeFlags('done', cloud.done),
         hidden: mergeFlags('hidden', cloud.hidden),
-        daily: mergeDaily(cloud.daily),
-        answers: mergeAnswers(cloud.answers)
+        daily: mergeDaily(cloud.daily)
+      };
+      /* Правки ответов — отдельным ключом, чтобы старые вкладки не затирали их. */
+      var ansDoc = {
+        schema: 1,
+        savedAt: Date.now(),
+        answers: mergeAnswers(ansCloud.answers)
       };
       globalViews = sumBuckets(buckets);
       persistLocal();
-      return fetchT(SYNC_URL, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'X-Mantle-Key': SYNC_KEY },
-        body: JSON.stringify(doc),
-        cache: 'no-store'
-      }, 20000);
+      return Promise.all([
+        postSyncDoc(SYNC_URL, doc),
+        postSyncDoc(SYNC_ANSWERS_URL, ansDoc)
+      ]);
     })
-    .then(function(r){
-      if (!r.ok) throw new Error('HTTP ' + r.status);
+    .then(function(){
       syncState.last = Date.now();
       syncState.failures = 0;
       syncState.dirty = syncState.seq !== startedSeq;
