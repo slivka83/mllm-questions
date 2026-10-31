@@ -74,6 +74,44 @@ header{position:sticky;top:0;z-index:20;display:flex;gap:10px;align-items:center
 .stats-empty{padding:28px 8px;text-align:center;color:var(--muted);font-size:13.5px;line-height:1.6}
 .stats-note{margin-top:12px;color:var(--muted);font-size:11.5px;text-align:center}
 body.stats-open{overflow:hidden}
+.edit-modal{position:fixed;inset:0;z-index:75;display:none;align-items:center;justify-content:center;
+  padding:16px;background:rgba(10,14,22,.45)}
+.edit-modal.open{display:flex}
+.edit-box{width:min(880px,100%);max-height:min(90vh,920px);display:flex;flex-direction:column;
+  overflow:hidden;background:var(--panel);color:var(--text);border:1px solid var(--border);
+  border-radius:16px;box-shadow:0 18px 50px rgba(0,0,0,.28)}
+.edit-head{display:flex;align-items:flex-start;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border)}
+.edit-title{font-size:15px;font-weight:700;line-height:1.3}
+.edit-sub{margin-top:3px;font-size:12px;color:var(--muted);max-width:660px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.edit-body{padding:14px 16px;overflow:auto;flex:1 1 auto}
+.edit-lbl{display:block;margin:0 0 6px;font-size:12px;font-weight:700;letter-spacing:.03em;
+  text-transform:uppercase;color:var(--muted)}
+.edit-lbl+.edit-ta{margin-bottom:14px}
+.edit-ta{display:block;width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);
+  background:var(--panel2);color:var(--text);font:13px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;
+  outline:none;resize:vertical}
+.edit-ta:focus{border-color:var(--accent)}
+#edit-short{min-height:72px}
+#edit-long{min-height:230px}
+.edit-previewbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:2px}
+.edit-previewbar button,.edit-foot button{height:34px;padding:0 12px;border-radius:9px;border:1px solid var(--border);
+  background:var(--panel2);color:var(--text);cursor:pointer;font-size:12.5px}
+.edit-previewbar button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.edit-hint{font-size:11.5px;color:var(--muted)}
+.edit-preview{margin-top:12px;padding:10px 14px;border:1px solid var(--border);border-radius:10px;
+  background:var(--panel2);max-height:340px;overflow:auto}
+.edit-preview[hidden]{display:none}
+.epv-sec+.epv-sec{margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}
+.epv-h{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.edit-foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 16px;
+  border-top:1px solid var(--border);background:var(--panel)}
+.edit-foot .edit-reset{margin-right:auto;color:var(--muted)}
+.edit-foot .edit-reset:disabled{opacity:.45;cursor:default}
+.edit-actions{display:flex;gap:8px;margin-left:auto}
+.edit-actions .primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.edit-foot button:hover:not(:disabled){filter:brightness(.97)}
+body.edit-open{overflow:hidden}
 #filters{display:none;align-items:center;justify-content:center;width:38px;height:38px;border-radius:10px;
   border:1px solid var(--border);background:var(--panel2);color:var(--text);cursor:pointer;font-size:17px;flex:none}
 button,input{font-family:inherit;touch-action:manipulation}
@@ -131,10 +169,10 @@ aside{position:sticky;top:76px;height:calc(100vh - 96px);overflow:auto;backgroun
 .dtopbar{position:sticky;top:var(--hdr,58px);z-index:19;display:flex;align-items:center;gap:10px;
   background:var(--bg);padding:10px 2px}
 .dtopbar .pcount{color:var(--muted);font-size:12.5px;white-space:nowrap}
-.dtopbar .back,.dtopbar .dhide,.dnav{height:30px;padding:0 10px;border-radius:9px;border:1px solid var(--border);
+.dtopbar .back,.dtopbar .dhide,.dtopbar .dedit,.dnav{height:30px;padding:0 10px;border-radius:9px;border:1px solid var(--border);
   background:var(--panel2);color:var(--text);cursor:pointer;font-size:12.5px;white-space:nowrap;
   min-width:0;overflow:hidden;text-overflow:ellipsis}
-.dtopbar .back:hover,.dtopbar .dhide:hover,.dnav:hover{border-color:var(--accent)}
+.dtopbar .back:hover,.dtopbar .dhide:hover,.dtopbar .dedit:hover,.dnav:hover{border-color:var(--accent)}
 .dnav{margin-left:auto;max-width:38%;text-align:left}
 .dtopbar .dnav+.dnav{margin-left:0}
 .detail{padding:18px 22px;box-shadow:var(--shadow);margin-bottom:12px}
@@ -199,8 +237,11 @@ kbd{font-family:inherit;font-size:11px;border:1px solid var(--border);border-bot
   .tq{font-size:18px}
   .tactions button{height:44px;flex:1 1 auto;font-size:15px}
   .dtopbar{gap:6px;flex-wrap:nowrap}
-  .dtopbar .back,.dtopbar .dhide,.dnav{height:32px;font-size:11.5px;padding:0 8px}
+  .dtopbar .back,.dtopbar .dhide,.dtopbar .dedit,.dnav{height:32px;font-size:11.5px;padding:0 8px}
+  .dtopbar .dedit span{display:none}
+  .dtopbar .dedit{width:32px;padding:0;flex:none}
   .dtopbar .pcount{font-size:11.5px;white-space:nowrap}
+  .edit-ta{font-size:16px}
   .dnav{max-width:30%}
   .ansbody{overflow-wrap:break-word}
   .ansbody table{display:block;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
@@ -213,6 +254,14 @@ kbd{font-family:inherit;font-size:11px;border:1px solid var(--border);border-bot
   .stats-sum{gap:6px}
   .stats-kpi .n{font-size:19px}
   .stats-row{grid-template-columns:86px minmax(0,1fr) 32px;font-size:12px}
+  .edit-box{max-height:94vh}
+  .edit-body{padding:12px}
+  .edit-foot{padding:10px 12px}
+  .edit-foot .edit-reset{order:2;margin-right:0;flex:1 1 100%}
+  .edit-actions{order:1;margin-left:0;flex:1 1 100%}
+  .edit-actions button{flex:1 1 0}
+  .edit-sub{white-space:normal}
+  #edit-long{min-height:180px}
 }
 @media (hover:none){
   .card:hover{transform:none;border-color:var(--border)}
@@ -245,6 +294,35 @@ kbd{font-family:inherit;font-size:11px;border:1px solid var(--border);border-bot
     <div class="stats-body" id="stats-body"></div>
   </div>
 </div>
+<div id="edit-modal" class="edit-modal" aria-hidden="true">
+  <div class="edit-box" role="dialog" aria-modal="true" aria-labelledby="edit-title">
+    <div class="edit-head">
+      <div style="min-width:0">
+        <div class="edit-title" id="edit-title">✏️ Редактор ответов</div>
+        <div class="edit-sub" id="edit-sub"></div>
+      </div>
+      <button id="edit-close" class="stats-close" type="button" title="Закрыть" aria-label="Закрыть">✕</button>
+    </div>
+    <div class="edit-body">
+      <label class="edit-lbl" for="edit-short">Краткий ответ</label>
+      <textarea id="edit-short" class="edit-ta" rows="3" spellcheck="true"></textarea>
+      <label class="edit-lbl" for="edit-long">Развернутый ответ</label>
+      <textarea id="edit-long" class="edit-ta" rows="12" spellcheck="true"></textarea>
+      <div class="edit-previewbar">
+        <button id="edit-preview-btn" type="button" aria-expanded="false">Предпросмотр</button>
+        <span class="edit-hint">Markdown и формулы $...$ · Ctrl+Enter — сохранить</span>
+      </div>
+      <div class="edit-preview" id="edit-preview" hidden></div>
+    </div>
+    <div class="edit-foot">
+      <button id="edit-reset" class="edit-reset" type="button">↩ Вернуть исходный</button>
+      <div class="edit-actions">
+        <button id="edit-cancel" type="button">Отмена</button>
+        <button id="edit-save" class="primary" type="button">Сохранить</button>
+      </div>
+    </div>
+  </div>
+</div>
 <div class="layout">
   <aside id="sidebar"></aside>
   <main id="main" style="min-width:0"><div id="viewroot"></div></main>
@@ -266,6 +344,8 @@ var QNUM = {};
 QS.forEach(function(q, i){ QNUM[q.id] = i + 1; });
 var SRC = {};
 DATA.sources.forEach(function(s){ SRC[s.id] = s; });
+var ORIG = {};
+QS.forEach(function(q){ ORIG[q.id] = { short: q.short, long: q.long }; });
 
 var $ = function(sel){ return document.querySelector(sel); };
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -293,6 +373,8 @@ if (!globalViews || typeof globalViews !== 'object'){
   globalViews = {};
   Object.keys(views).forEach(function(id){ var n = Number(views[id])||0; if (n>0) globalViews[id] = n; });
 }
+var answers = store.get('qa.answers', {});
+if (!answers || typeof answers !== 'object' || Array.isArray(answers)) answers = {};
 
 var state = {
   view: 'list',
@@ -623,6 +705,47 @@ function plainQ(s){
 }
 function qHtml(s){ return unstashImages(esc(s)).replace(/`([^`]+)`/g, '<code>$1</code>'); }
 
+/* ----------------------------- правки ответов ----------------------------- */
+/* Храним в qa.answers: {id: {short, long, t}}; удаление — {del:1, t}. */
+function hasOwn(o, k){ return Object.prototype.hasOwnProperty.call(o, k); }
+function normAnswer(a){
+  if (!a || typeof a !== 'object' || Array.isArray(a)) return null;
+  var t = Number(a.t) || 0;
+  if (a.del) return { del: 1, t: t };
+  var out = { t: t };
+  if (hasOwn(a, 'short')) out.short = a.short == null ? '' : String(a.short);
+  if (hasOwn(a, 'long')) out.long = a.long == null ? '' : String(a.long);
+  return out;
+}
+function applyAnswer(it, a){
+  var o = ORIG[it.id];
+  if (!o) return;
+  if (a && !a.del){
+    it.short = hasOwn(a, 'short') ? a.short : o.short;
+    it.long = hasOwn(a, 'long') ? a.long : o.long;
+  } else {
+    it.short = o.short;
+    it.long = o.long;
+  }
+}
+function applyAllAnswers(){
+  QS.forEach(function(it){
+    var a = normAnswer(answers[it.id]);
+    if (a) answers[it.id] = a;
+    applyAnswer(it, a);
+  });
+}
+function answerHasOverride(id){ var a = answers[id]; return !!(a && !a.del); }
+(function(){
+  var clean = {};
+  Object.keys(answers).forEach(function(id){
+    var a = normAnswer(answers[id]);
+    if (a) clean[id] = a;
+  });
+  answers = clean;
+  applyAllAnswers();
+})();
+
 /* --- математика: выкусываем $...$, $$...$$, \(...\), \[...\] до markdown --- */
 function stash1(latex, disp, st){
   st.push({ latex: latex, disp: disp });
@@ -888,6 +1011,7 @@ function renderDetail(){
   var html = '<div class="dtopbar">'
       + '<button class="back" data-act="back">← к списку</button>'
       + '<button class="dhide" data-act="hide" data-id="'+it.id+'" title="'+(state.hiddenOnly?'Вернуть в списки':'Скрыть вопрос')+'">'+(state.hiddenOnly?'👁 вернуть в списки':'🙈 скрыть')+'</button>'
+      + '<button class="dedit" data-act="edit" data-id="'+it.id+'" title="Редактировать ответ" aria-label="Редактировать ответ">✏️ <span>править</span></button>'
       + '<span class="pcount">'+(idx+1)+' из '+pool.length+'</span>'
       + (prev ? '<button class="dnav" data-act="open" data-id="'+prev.id+'" title="'+esc(plainQ(prev.q))+'">← '+esc(cut(plainQ(prev.q),44))+'</button>' : '<span class="dnav-sp"></span>')
       + (next ? '<button class="dnav" data-act="open" data-id="'+next.id+'" title="'+esc(plainQ(next.q))+'">'+esc(cut(plainQ(next.q),44))+' →</button>' : '<span class="dnav-sp"></span>')
@@ -1050,6 +1174,91 @@ function bumpView(id){
   saveState();
 }
 
+/* ----------------------------- редактор ответов ----------------------------- */
+var editor = { id: null, baseShort: '', baseLong: '' };
+function openEditor(id){
+  var it = QS.filter(function(q){ return q.id === +id; })[0];
+  if (!it) return;
+  closeStats();
+  editor.id = it.id;
+  editor.baseShort = it.short || '';
+  editor.baseLong = it.long || '';
+  $('#edit-sub').textContent = '#' + QNUM[it.id] + ' · ' + cut(plainQ(it.q), 90);
+  $('#edit-short').value = editor.baseShort;
+  $('#edit-long').value = editor.baseLong;
+  var pv = $('#edit-preview'), pb = $('#edit-preview-btn');
+  pv.hidden = true; pv.innerHTML = '';
+  pb.classList.remove('on'); pb.setAttribute('aria-expanded', 'false');
+  pb.textContent = 'Предпросмотр';
+  $('#edit-reset').disabled = !answerHasOverride(it.id);
+  var m = $('#edit-modal');
+  m.classList.add('open'); m.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('edit-open');
+  setTimeout(function(){ $('#edit-long').focus(); }, 30);
+}
+function editorDirty(){
+  if (editor.id == null) return false;
+  return $('#edit-short').value !== editor.baseShort || $('#edit-long').value !== editor.baseLong;
+}
+function closeEditor(force){
+  if (!force && editorDirty() && !confirm('Закрыть редактор без сохранения?')) return;
+  var m = $('#edit-modal');
+  m.classList.remove('open'); m.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('edit-open');
+  editor.id = null; editor.baseShort = ''; editor.baseLong = '';
+}
+function editorPreviewHtml(){
+  var short = $('#edit-short').value, long = $('#edit-long').value;
+  var html = '';
+  if (short.trim()) html += '<div class="epv-sec"><div class="epv-h">Краткий ответ</div><div class="ansbody">' + md(short) + '</div></div>';
+  html += '<div class="epv-sec"><div class="epv-h">Развернутый ответ</div><div class="ansbody">' + md(long || '—') + '</div></div>';
+  return html;
+}
+function refreshEditorPreview(){
+  if (!$('#edit-preview').hidden) $('#edit-preview').innerHTML = editorPreviewHtml();
+}
+function toggleEditorPreview(){
+  var pv = $('#edit-preview'), pb = $('#edit-preview-btn');
+  var show = pv.hidden;
+  pv.hidden = !show;
+  pb.classList.toggle('on', show);
+  pb.setAttribute('aria-expanded', show ? 'true' : 'false');
+  pb.textContent = show ? 'Скрыть предпросмотр' : 'Предпросмотр';
+  if (show) refreshEditorPreview();
+}
+function saveEditor(){
+  if (editor.id == null) return;
+  var it = QS.filter(function(q){ return q.id === editor.id; })[0];
+  if (!it) { closeEditor(true); return; }
+  var short = $('#edit-short').value, long = $('#edit-long').value;
+  if (short === editor.baseShort && long === editor.baseLong){ closeEditor(true); return; }
+  if (!short.trim() && !long.trim()){ toast('Ответ пустой — сохранить нельзя'); return; }
+  answers[it.id] = { short: short, long: long, t: Date.now() };
+  applyAnswer(it, answers[it.id]);
+  saveState();
+  closeEditor(true);
+  renderAll();
+  toast('Ответ сохранён');
+}
+function resetEditor(){
+  if (editor.id == null || !answerHasOverride(editor.id)) return;
+  if (!confirm('Вернуть исходный ответ? Правка будет удалена на всех устройствах.')) return;
+  var it = QS.filter(function(q){ return q.id === editor.id; })[0];
+  if (!it) { closeEditor(true); return; }
+  answers[it.id] = { del: 1, t: Date.now() };
+  applyAnswer(it, answers[it.id]);
+  saveState();
+  closeEditor(true);
+  renderAll();
+  toast('Исходный ответ восстановлен');
+}
+function editorKeydown(e){
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter'){
+    e.preventDefault();
+    saveEditor();
+  }
+}
+
 function handleAct(el, ev){
   var act = el.getAttribute('data-act'), id = el.getAttribute('data-id');
   switch(act){
@@ -1073,6 +1282,8 @@ function handleAct(el, ev){
     case 'hide':
       setFlag('hidden', id, !hidden[id]);
       refreshPool(); renderAll(); break;
+    case 'edit':
+      openEditor(id); break;
     case 'unhide-all':
       Object.keys(hidden).forEach(function(k){ flagTimes.hidden[k] = Date.now(); });
       hidden = {}; saveState();
@@ -1130,7 +1341,7 @@ var syncState = { busy:false, queued:false, dirty:false, last:0, seq:0, timer:0,
 function persistLocal(){
   store.set('qa.favs', favs); store.set('qa.done', done); store.set('qa.hidden', hidden);
   store.set('qa.views', views); store.set('qa.globalViews', globalViews);
-  store.set('qa.daily', daily);
+  store.set('qa.daily', daily); store.set('qa.answers', answers);
   store.set('qa.flagTimes', flagTimes); store.set('qa.device', DEVICE);
 }
 function saveState(){
@@ -1213,6 +1424,29 @@ function mergeDaily(cloudDaily){
   return out;
 }
 
+/* Правки ответов: {id:{short,long,t}}; {del:1,t} — возврат к исходному.
+   Побеждает более поздняя правка. */
+function mergeAnswers(cloudAnswers){
+  var out = {}, ids = {};
+  Object.keys(answers || {}).forEach(function(id){ ids[id] = 1; });
+  Object.keys(cloudAnswers || {}).forEach(function(id){ ids[id] = 1; });
+  Object.keys(ids).forEach(function(id){
+    var l = normAnswer(answers[id]);
+    var c = normAnswer((cloudAnswers || {})[id]);
+    var pick = l;
+    if (!l) pick = c;
+    else if (c && c.t > l.t) pick = c;
+    if (pick) out[id] = pick;
+  });
+  answers = out;
+  applyAllAnswers();
+  var em = $('#edit-modal');
+  if (em && em.classList.contains('open') && editor.id != null){
+    $('#edit-reset').disabled = !answerHasOverride(editor.id);
+  }
+  return out;
+}
+
 /* Флаги сливаем по времени изменения; {v:0,t} — tombstone (снятие/возврат). */
 function mergeFlags(kind, cloudMap){
   var localMap = kind==='favs' ? favs : kind==='done' ? done : hidden;
@@ -1283,7 +1517,8 @@ function syncNow(manual){
         favs: mergeFlags('favs', cloud.favs),
         done: mergeFlags('done', cloud.done),
         hidden: mergeFlags('hidden', cloud.hidden),
-        daily: mergeDaily(cloud.daily)
+        daily: mergeDaily(cloud.daily),
+        answers: mergeAnswers(cloud.answers)
       };
       globalViews = sumBuckets(buckets);
       persistLocal();
@@ -1306,7 +1541,7 @@ function syncNow(manual){
         syncIcon('✓', 'Синхронизировано');
       }
       if (manual) toast(syncState.dirty ? 'Синхронизировано, есть новые изменения…' : 'Синхронизировано');
-      if (state.view === 'list') renderAll(); else renderSidebar();
+      if (state.view === 'list' || state.view === 'detail') renderAll(); else renderSidebar();
       if ($('#stats-modal').classList.contains('open')) renderStats();
     })
     .catch(function(){
@@ -1383,6 +1618,16 @@ $('#theme').addEventListener('click', function(){
 $('#stats').addEventListener('click', openStats);
 $('#stats-close').addEventListener('click', closeStats);
 $('#stats-modal').addEventListener('click', function(e){ if (e.target === this) closeStats(); });
+$('#edit-close').addEventListener('click', function(){ closeEditor(false); });
+$('#edit-cancel').addEventListener('click', function(){ closeEditor(false); });
+$('#edit-modal').addEventListener('click', function(e){ if (e.target === this) closeEditor(false); });
+$('#edit-save').addEventListener('click', saveEditor);
+$('#edit-reset').addEventListener('click', resetEditor);
+$('#edit-preview-btn').addEventListener('click', toggleEditorPreview);
+$('#edit-short').addEventListener('input', refreshEditorPreview);
+$('#edit-long').addEventListener('input', refreshEditorPreview);
+$('#edit-short').addEventListener('keydown', editorKeydown);
+$('#edit-long').addEventListener('keydown', editorKeydown);
 $('#filters').addEventListener('click', function(){
   document.body.classList.toggle('filters-open');
   syncFilterBtn();
@@ -1412,7 +1657,9 @@ document.getElementById('main').addEventListener('keydown', function(e){
 });
 
 document.addEventListener('keydown', function(e){
+  if (e.key === 'Escape' && $('#edit-modal').classList.contains('open')){ closeEditor(false); return; }
   if (e.key === 'Escape' && document.body.classList.contains('stats-open')){ closeStats(); return; }
+  if ($('#edit-modal').classList.contains('open')) return;
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
   if (state.view === 'detail') {
     if (e.code === 'ArrowLeft') handleAct({getAttribute:function(){return 'prev';}}, null);
