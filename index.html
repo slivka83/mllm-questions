@@ -189,7 +189,7 @@ aside{position:sticky;top:76px;height:calc(100vh - 96px);overflow:auto;backgroun
   background:var(--panel2);border:1px solid var(--border);font-size:11px;color:var(--muted);text-align:center}
 .simlist{margin:10px 0 0;padding-left:1.7em}
 .simlist li{margin:0 0 5px;line-height:1.45}
-.simlink{border:0;background:transparent;padding:0;font:inherit;color:var(--accent);text-align:left;cursor:pointer}
+.simlink{border:0;background:transparent;padding:0;font:inherit;color:var(--accent);text-align:left;cursor:pointer;text-decoration:none}
 .simlink:hover{text-decoration:underline}
 .simmeta{color:var(--muted);font-size:12px;white-space:nowrap}
 .fixbox{margin-top:16px;padding-top:14px;border-top:1px solid var(--border)}
@@ -1057,7 +1057,7 @@ function simHtml(it){
   if (!rows.length) return '';
   var html = '<details class="simbox"><summary>Похожие вопросы <span class="simn">'+rows.length+'</span></summary><ol class="simlist">';
   rows.forEach(function(q){
-    html += '<li><button class="simlink" data-act="open" data-id="'+q.id+'" title="'+esc(plainQ(q.q))+'">'+esc(plainQ(q.q))+'</button>'
+    html += '<li><a class="simlink" href="#q'+q.id+'" target="_blank" rel="noopener" title="'+esc(plainQ(q.q))+'">'+esc(plainQ(q.q))+'</a>'
         + ' <span class="simmeta">#'+QNUM[q.id]+' · '+esc(SRC[q.src].short)+'</span></li>';
   });
   return html + '</ol></details>';
@@ -1780,7 +1780,11 @@ syncStickyTop();
 if (window.addEventListener) window.addEventListener('resize', syncStickyTop);
 var savedMode = store.get('qa.mode', 'list');
 if (['list','train'].indexOf(savedMode) < 0) savedMode = 'list';
-setView(savedMode);
+/* глубокая ссылка #q<id> — так открываются «Похожие вопросы» в новом окне */
+var mHash = (location.hash||'').match(/^#q(\d+)$/);
+var qHash = mHash ? QS.filter(function(q){ return q.id === +mHash[1]; })[0] : null;
+if (qHash){ bumpView(qHash.id); state.from='list'; state.cur=qHash; state.view='detail'; renderAll(); }
+else setView(savedMode);
 
 syncIcon('☁', 'Синхронизация');
 var syncBtn = document.getElementById('sync');
