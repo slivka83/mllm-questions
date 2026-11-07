@@ -1050,7 +1050,7 @@ function simHtml(it){
     sid = +sid;
     if (sid === it.id || seen[sid]) return;
     var q = QS.filter(function(x){ return x.id === sid; })[0];
-    if (!q || state.filtered.indexOf(q) === -1) return;
+    if (!q || hidden[q.id] || state.filtered.indexOf(q) === -1) return;
     seen[sid] = 1;
     rows.push(q);
   });
