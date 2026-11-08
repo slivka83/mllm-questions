@@ -378,6 +378,8 @@ html[data-theme=dark] .fixrow-now .fixlabel{color:#4ade80}
 .ansbody figure.picfig figcaption{margin-top:6px;font-size:12.5px;line-height:1.35;color:var(--muted)}
 img.mimg{height:1.35em;width:auto;max-width:100%;vertical-align:-.3em;background:#fff;border-radius:4px;padding:0 2px;margin:0 1px}
 .ansbody img.mimg-block{display:block;height:auto;max-height:2.9em;width:auto;max-width:100%;margin:.65em auto;padding:2px 4px}
+/* markdown-картинки ![](url): блок по центру; размер — через |W / |WxH в URL */
+img.ansimg{display:block;max-width:100%;height:auto;margin:10px auto;border:1px solid var(--border);border-radius:10px;background:#fff;padding:4px;box-sizing:border-box}
 html[data-theme=dark] img.mimg{filter:invert(1) hue-rotate(180deg);background:transparent}
 .ansbody strong,.ansbody b,.ansbody th{font-weight:400}
 .tagchip:hover{border-color:var(--accent);color:var(--accent)}
@@ -2084,6 +2086,18 @@ function structureFences(src){
   }
   return outl.join('\n');
 }
+/* Размер markdown-картинки: url, заканчивающийся на |600 / |600x400 / |50% (marked
+   кодирует | в %7C, % в %25 — понимаем оба вида), либо title="600x400". */
+function parseImgSize(href, title){
+  href = String(href||'');
+  var m = href.match(/(?:%7C|\|)(\d+)(?:x(\d+))?$/i);
+  if (m) return { w:+m[1], h:m[2]?+m[2]:0, pct:0, src:href.slice(0, href.length-m[0].length) };
+  m = href.match(/(?:%7C|\|)(\d+)(?:%25|%)?$/i);
+  if (m) return { w:+m[1], h:0, pct:+m[1], src:href.slice(0, href.length-m[0].length) };
+  m = String(title||'').match(/^(\d+)(?:[x×](\d+))?$/);
+  if (m) return { w:+m[1], h:m[2]?+m[2]:0, pct:0, src:href };
+  return null;
+}
 function md(src){
   if (!src) return '';
   var st = [];
@@ -2096,6 +2110,18 @@ function md(src){
     try { html = window.marked.parse(text, {gfm:true, breaks:false}); }
     catch(e){ html = fallbackMd(text); }
   } else html = fallbackMd(text);
+  /* markdown-картинки: центр + размер |W / |WxH (title="WxH" тоже считают размером) */
+  html = html.replace(/<img src="([^"]*)" alt="([^"]*)"(?: title="([^"]*)")?( ?\/)?>/g, function(all, href, alt, ttl, sl){
+    var sz = parseImgSize(href, ttl);
+    var stl = '';
+    if (sz){
+      href = sz.src;
+      if (sz.pct) stl = 'width:'+sz.pct+'%';
+      else if (sz.h) stl = 'width:'+sz.w+'px;height:'+sz.h+'px;object-fit:contain';
+      else stl = 'width:'+sz.w+'px';
+    }
+    return '<img class="ansimg"'+(stl?' style="'+stl+'"':'')+' src="'+href+'" alt="'+alt+'"'+(sl||'')+'>';
+  });
   html = html.replace(/!!P(\d+)!!/g, function(m, i){
     var mk = (pics[+i]||'').match(/^⟦pic:([A-Za-z0-9_.-]+)\$?\|([\s\S]*)⟧$/);
     if (!mk) return '<p>' + (pics[+i]||'') + '</p>';
