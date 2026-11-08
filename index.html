@@ -245,6 +245,7 @@ body.stats-open{overflow:hidden}
   background:var(--panel2);color:var(--text);font:13px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;
   outline:none;resize:vertical}
 .edit-ta:focus{border-color:var(--accent)}
+#edit-q{min-height:56px}
 #edit-short{min-height:72px}
 #edit-long{min-height:230px}
 .edit-previewbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:2px}
@@ -257,6 +258,7 @@ body.stats-open{overflow:hidden}
 .edit-preview[hidden]{display:none}
 .epv-sec+.epv-sec{margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}
 .epv-h{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.epv-q{font-size:15px;font-weight:600;line-height:1.35}
 .edit-foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 16px;
   border-top:1px solid var(--border);background:var(--panel)}
 .edit-foot .edit-reset{margin-right:auto;color:var(--muted)}
@@ -492,6 +494,8 @@ kbd{font-family:inherit;font-size:11px;border:1px solid var(--border);border-bot
       <button id="edit-close" class="stats-close" type="button" title="Закрыть" aria-label="Закрыть">✕</button>
     </div>
     <div class="edit-body">
+      <label class="edit-lbl" for="edit-q">Вопрос</label>
+      <textarea id="edit-q" class="edit-ta" rows="2" spellcheck="true"></textarea>
       <label class="edit-lbl" for="edit-short">Краткий ответ</label>
       <textarea id="edit-short" class="edit-ta" rows="3" spellcheck="true"></textarea>
       <label class="edit-lbl" for="edit-long">Развернутый ответ</label>
@@ -1747,7 +1751,7 @@ QS.forEach(function(q, i){ QNUM[q.id] = i + 1; });
 var SRC = {};
 DATA.sources.forEach(function(s){ SRC[s.id] = s; });
 var ORIG = {};
-QS.forEach(function(q){ ORIG[q.id] = { short: q.short, long: q.long }; });
+QS.forEach(function(q){ ORIG[q.id] = { short: q.short, long: q.long, q: q.q }; });
 
 var $ = function(sel){ return document.querySelector(sel); };
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -2155,6 +2159,7 @@ function normAnswer(a){
   var out = { t: t };
   if (hasOwn(a, 'short')) out.short = a.short == null ? '' : String(a.short);
   if (hasOwn(a, 'long')) out.long = a.long == null ? '' : String(a.long);
+  if (hasOwn(a, 'q')) out.q = a.q == null ? '' : String(a.q);
   return out;
 }
 function applyAnswer(it, a){
@@ -2163,9 +2168,11 @@ function applyAnswer(it, a){
   if (a && !a.del){
     it.short = hasOwn(a, 'short') ? a.short : o.short;
     it.long = hasOwn(a, 'long') ? a.long : o.long;
+    it.q = hasOwn(a, 'q') ? a.q : o.q;
   } else {
     it.short = o.short;
     it.long = o.long;
+    it.q = o.q;
   }
 }
 function applyAllAnswers(){
@@ -2654,7 +2661,7 @@ function bumpView(id){
 }
 
 /* ----------------------------- редактор ответов ----------------------------- */
-var editor = { id: null, baseShort: '', baseLong: '' };
+var editor = { id: null, baseShort: '', baseLong: '', baseQ: '' };
 function openEditor(id){
   var it = QS.filter(function(q){ return q.id === +id; })[0];
   if (!it) return;
@@ -2662,7 +2669,9 @@ function openEditor(id){
   editor.id = it.id;
   editor.baseShort = it.short || '';
   editor.baseLong = it.long || '';
+  editor.baseQ = it.q || '';
   $('#edit-sub').textContent = '#' + QNUM[it.id] + ' · ' + cut(plainQ(it.q), 90);
+  $('#edit-q').value = editor.baseQ;
   $('#edit-short').value = editor.baseShort;
   $('#edit-long').value = editor.baseLong;
   var pv = $('#edit-preview'), pb = $('#edit-preview-btn');
@@ -2677,18 +2686,21 @@ function openEditor(id){
 }
 function editorDirty(){
   if (editor.id == null) return false;
-  return $('#edit-short').value !== editor.baseShort || $('#edit-long').value !== editor.baseLong;
+  return $('#edit-q').value !== editor.baseQ
+      || $('#edit-short').value !== editor.baseShort
+      || $('#edit-long').value !== editor.baseLong;
 }
 function closeEditor(force){
   if (!force && editorDirty() && !confirm('Закрыть редактор без сохранения?')) return;
   var m = $('#edit-modal');
   m.classList.remove('open'); m.setAttribute('aria-hidden', 'true');
   document.body.classList.remove('edit-open');
-  editor.id = null; editor.baseShort = ''; editor.baseLong = '';
+  editor.id = null; editor.baseShort = ''; editor.baseLong = ''; editor.baseQ = '';
 }
 function editorPreviewHtml(){
-  var short = $('#edit-short').value, long = $('#edit-long').value;
+  var q = $('#edit-q').value, short = $('#edit-short').value, long = $('#edit-long').value;
   var html = '';
+  if (q.trim()) html += '<div class="epv-sec"><div class="epv-h">Вопрос</div><div class="epv-q">' + qHtml(q) + '</div></div>';
   if (short.trim()) html += '<div class="epv-sec"><div class="epv-h">Краткий ответ</div><div class="ansbody">' + md(short) + '</div></div>';
   html += '<div class="epv-sec"><div class="epv-h">Развернутый ответ</div><div class="ansbody">' + md(long || '—') + '</div></div>';
   return html;
@@ -2712,15 +2724,19 @@ function saveEditor(){
   if (editor.id == null) return;
   var it = QS.filter(function(q){ return q.id === editor.id; })[0];
   if (!it) { closeEditor(true); return; }
-  var short = $('#edit-short').value, long = $('#edit-long').value;
-  if (short === editor.baseShort && long === editor.baseLong){ closeEditor(true); return; }
+  var q = $('#edit-q').value, short = $('#edit-short').value, long = $('#edit-long').value;
+  if (q === editor.baseQ && short === editor.baseShort && long === editor.baseLong){ closeEditor(true); return; }
+  if (!q.trim()){ toast('Вопрос пустой — сохранить нельзя'); return; }
   if (!short.trim() && !long.trim()){ toast('Ответ пустой — сохранить нельзя'); return; }
-  answers[it.id] = { short: short, long: long, t: Date.now() };
+  /* q и short/long всегда записываем те, что сейчас в полях: замена записи целиком,
+     чтобы правка одного поля не стёрла ранее перенесённые правки других полей. */
+  var qChanged = q !== editor.baseQ;
+  answers[it.id] = { q: q, short: short, long: long, t: Date.now() };
   applyAnswer(it, answers[it.id]);
   saveState();
   closeEditor(true);
   renderAll();
-  toast('Ответ сохранён');
+  toast(qChanged ? 'Вопрос и ответ сохранены' : 'Ответ сохранён');
 }
 function resetEditor(){
   if (editor.id == null || !answerHasOverride(editor.id)) return;
@@ -3210,6 +3226,8 @@ $('#edit-modal').addEventListener('click', function(e){ if (e.target === this) c
 $('#edit-save').addEventListener('click', saveEditor);
 $('#edit-reset').addEventListener('click', resetEditor);
 $('#edit-preview-btn').addEventListener('click', toggleEditorPreview);
+$('#edit-q').addEventListener('input', refreshEditorPreview);
+$('#edit-q').addEventListener('keydown', editorKeydown);
 $('#edit-short').addEventListener('input', refreshEditorPreview);
 $('#edit-long').addEventListener('input', refreshEditorPreview);
 $('#edit-short').addEventListener('keydown', editorKeydown);
