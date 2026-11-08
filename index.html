@@ -2834,6 +2834,89 @@ function saveState(){
   scheduleSync(1200);
 }
 
+/* ----------------------------- чужие вкладки ----------------------------- */
+/* Другая вкладка может скрыть вопрос/поправить ответ, пока эта вкладка спит.
+   Если не до-забирать её записи из localStorage, persistLocal этой вкладки
+   перетрёт их своим устаревшим состоянием (скрытие «откатывалось» после F5).
+   Сливаем память и localStorage по времени изменения, как mergeFlags, но без облака. */
+function adoptFlags(){
+  var root = store.get('qa.flagTimes', {});
+  if (!root || typeof root !== 'object') root = {};
+  [['favs','qa.favs'], ['done','qa.done'], ['hidden','qa.hidden']].forEach(function(p){
+    var kind = p[0];
+    var stored = store.get(p[1], {});
+    if (!stored || typeof stored !== 'object' || Array.isArray(stored)) stored = {};
+    var map = kind==='favs' ? favs : kind==='done' ? done : hidden;
+    var times = flagTimes[kind];
+    var sTimes = (root[kind] && typeof root[kind] === 'object') ? root[kind] : {};
+    var ids = {};
+    [map, times, stored, sTimes].forEach(function(m){ Object.keys(m).forEach(function(id){ ids[id] = 1; }); });
+    Object.keys(ids).forEach(function(id){
+      var cv = stored[id] ? 1 : 0, ct = Number(sTimes[id]) || 0;
+      var lv = map[id] ? 1 : 0, lt = Number(times[id]) || 0;
+      var v, t;
+      if (lt > ct){ v = lv; t = lt; }
+      else if (ct > lt){ v = cv; t = ct; }
+      else { v = (lv || cv) ? 1 : 0; t = lt || ct; }
+      if (v) map[id] = 1; else delete map[id];
+      if (t || v) times[id] = t; else delete times[id];
+    });
+  });
+}
+function adoptViewsDaily(){
+  var v = store.get('qa.views', {});
+  if (v && typeof v === 'object' && !Array.isArray(v)){
+    Object.keys(v).forEach(function(id){
+      var n = Number(v[id]) || 0;
+      if (n > (Number(views[id]) || 0)) views[id] = n;
+    });
+  }
+  var g = store.get('qa.globalViews', {});
+  if (g && typeof g === 'object' && !Array.isArray(g)){
+    Object.keys(g).forEach(function(id){
+      var n = Number(g[id]) || 0;
+      if (n > (Number(globalViews[id]) || 0)) globalViews[id] = n;
+    });
+  }
+  var d = store.get('qa.daily', null);
+  if (d && typeof d === 'object' && !Array.isArray(d)){
+    Object.keys(d).forEach(function(day){
+      var m = d[day];
+      if (!m || typeof m !== 'object' || Array.isArray(m)) return;
+      var dst = daily[day] || (daily[day] = {});
+      Object.keys(m).forEach(function(id){ if (m[id]) dst[id] = 1; });
+    });
+  }
+}
+function adoptAnswers(){
+  var stored = store.get('qa.answers', null);
+  if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return false;
+  var ids = {};
+  Object.keys(answers).forEach(function(id){ ids[id] = 1; });
+  Object.keys(stored).forEach(function(id){ ids[id] = 1; });
+  var changed = false;
+  Object.keys(ids).forEach(function(id){
+    var l = normAnswer(answers[id]);
+    var c = normAnswer(stored[id]);
+    var pick = l;
+    if (!l) pick = c;
+    else if (c && c.t > l.t) pick = c;
+    if (!pick || pick === l) return;
+    answers[id] = pick;
+    changed = true;
+  });
+  if (changed) applyAllAnswers();
+  return changed;
+}
+/* Возвращает true, если изменились флаги или правки ответов (нужен перерендер). */
+function adoptLocal(){
+  var was = JSON.stringify([favs, done, hidden]);
+  adoptFlags();
+  adoptViewsDaily();
+  var ansChanged = adoptAnswers();
+  return (was !== JSON.stringify([favs, done, hidden])) || ansChanged;
+}
+
 function syncIcon(icon, title, busy){
   var b = document.getElementById('sync');
   if (!b) return;
@@ -3000,6 +3083,7 @@ function syncNow(manual){
   if (syncState.busy){ syncState.queued = true; return; }
   if (syncState.timer){ clearTimeout(syncState.timer); syncState.timer = 0; }
   syncState.busy = true;
+  adoptLocal(); // другие вкладки могли что-то поменять, пока мы спали
   syncIcon('⟳', 'Синхронизация…', true);
   var startedSeq = syncState.seq;
 
@@ -3025,6 +3109,7 @@ function syncNow(manual){
         answers: mergeAnswers(ansCloud.answers)
       };
       globalViews = sumBuckets(buckets);
+      adoptLocal(); // пока грузили облако, другие вкладки могли успеть дописать
       persistLocal();
       return Promise.all([
         postSyncDoc(SYNC_URL, doc),
@@ -3188,6 +3273,14 @@ if (syncBtn) syncBtn.addEventListener('click', function(){
 });
 document.addEventListener('visibilitychange', function(){
   if (document.visibilityState === 'visible') scheduleSync(900);
+});
+/* Другая вкладка изменила прогресс — подхватываем сразу, не дожидаясь F5. */
+window.addEventListener('storage', function(e){
+  if (!e || !e.key) return;
+  if (['qa.favs','qa.done','qa.hidden','qa.flagTimes','qa.views','qa.globalViews','qa.answers','qa.daily'].indexOf(e.key) === -1) return;
+  if (adoptLocal()){
+    if (state.view === 'detail' || state.view === 'list') renderAll(); else renderSidebar();
+  }
 });
 window.addEventListener('focus', function(){
   if (document.visibilityState === 'visible') scheduleSync(900);
