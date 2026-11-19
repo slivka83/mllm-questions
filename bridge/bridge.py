@@ -14,12 +14,19 @@
   5. Пишет site/snapshot.json — сайт отдаёт его как свежий снимок с mismo origin.
 """
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import time
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
 
 BASE_DIR = Path(__file__).resolve().parent.parent  # site/
 NS = "mlq58f716457a"
@@ -28,6 +35,15 @@ MANTLE_KEY = "1162a83b616bbf943548722ffb965e6b2b9d33c783b3f9e7e2138f2487cba245"
 TEXTDB = "https://textdb.dev/api/data/"
 UA = "Mozilla/5.0 (compatible; mllm-sync-bridge/1.0)"
 STALE_DEVICE_MS = 45 * 24 * 3600 * 1000
+# Второй канал записи: retained-сообщения публичных MQTT-брокеров.
+# (host, port, tls) — на Actions обычно доступен TCP 1883, WSS оставлен запасным.
+MQTT_BROKERS = [
+    ("broker.hivemq.com", 1883, False),
+    ("broker.emqx.io", 1883, False),
+    ("broker.hivemq.com", 8884, True),
+    ("broker.emqx.io", 8084, True),
+]
+MQTT_WAIT = 5.0
 
 
 def _curl_http(url, method="GET", headers=None, data=None, timeout=40):
@@ -195,26 +211,247 @@ def merge_daily(dst, src):
     return changed
 
 
+def norm_p(doc):
+    if not isinstance(doc, dict):
+        doc = {}
+    for k in ("views", "favs", "done", "hidden", "daily"):
+        if not isinstance(doc.get(k), dict):
+            doc[k] = {}
+    return doc
+
+
+def norm_a(doc):
+    if not isinstance(doc, dict):
+        doc = {}
+    if not isinstance(doc.get("answers"), dict):
+        doc["answers"] = {}
+    return doc
+
+
+def merge_cloud_into(base_p, base_a, pdoc, adoc):
+    """Текущее облако → накопительная база снимка (победа по t)."""
+    changed = False
+    for kind in ("favs", "done", "hidden"):
+        if merge_flags(base_p[kind], pdoc.get(kind)):
+            changed = True
+    for dev, m in (pdoc.get("views") or {}).items():
+        if isinstance(m, dict) and merge_views(base_p["views"].setdefault(dev, {}), m):
+            changed = True
+    if merge_daily(base_p["daily"], pdoc.get("daily")):
+        changed = True
+    if merge_answers(base_a["answers"], adoc.get("answers")):
+        changed = True
+    for k in ("schema", "savedAt"):
+        if pdoc.get(k) and (k not in base_p or int(pdoc.get(k) or 0) > int(base_p.get(k) or 0)):
+            base_p[k] = pdoc[k]
+    for k in ("schema", "savedAt"):
+        if adoc.get(k) and (k not in base_a or int(adoc.get(k) or 0) > int(base_a.get(k) or 0)):
+            base_a[k] = adoc[k]
+    return changed
+
+
+def apply_outbox(pdoc, adoc, dev, ob):
+    """Дельта устройства (textdb-документ) → документы снимка."""
+    if not isinstance(ob, dict):
+        return False
+    changed = False
+    for kind in ("favs", "done", "hidden"):
+        if merge_flags(pdoc[kind], ob.get(kind)):
+            changed = True
+    if isinstance(ob.get("views"), dict):
+        if merge_views(pdoc["views"].setdefault(dev, {}), ob["views"]):
+            changed = True
+    if isinstance(ob.get("daily"), dict):
+        if merge_daily(pdoc["daily"], ob["daily"]):
+            changed = True
+    pairs = []
+    if isinstance(ob.get("a"), list):
+        pairs.extend(ob["a"])
+    if isinstance(ob.get("_answerPairs"), list):
+        pairs.extend(ob["_answerPairs"])
+    recs = {}
+    for pair in pairs:
+        if isinstance(pair, list) and len(pair) == 2 and isinstance(pair[1], dict):
+            recs[str(pair[0])] = pair[1]
+    if recs and merge_answers(adoc["answers"], recs):
+        changed = True
+    return changed
+
+
+def read_textdb_device(dev):
+    raw = textdb_get(f"{NS}-out-{dev}")
+    if not raw:
+        return dev, None
+    try:
+        ob = json.loads(raw)
+    except Exception:
+        print(f"  ! textdb {dev}: кривая дельта")
+        return dev, None
+    if not isinstance(ob, dict):
+        return dev, None
+    try:
+        nparts = int(ob.get("aParts") or 0)
+    except Exception:
+        nparts = 0
+    pairs = []
+    for i in range(min(nparts, 40)):
+        part_raw = textdb_get(f"{NS}-outa-{dev}-{i}")
+        if not part_raw:
+            continue
+        try:
+            part = json.loads(part_raw)
+        except Exception:
+            continue
+        if isinstance(part, list):
+            pairs.extend(part)
+    if pairs:
+        ob["_answerPairs"] = pairs
+    return dev, ob
+
+
+def snapshot_extra(base_p, base_a, pdoc, adoc):
+    """Есть ли в накопительном снимке записи новее облачных (дельты, ещё не в mantledb)."""
+    for kind in ("favs", "done", "hidden"):
+        cloud = pdoc.get(kind) or {}
+        for i, e in (base_p.get(kind) or {}).items():
+            if not isinstance(e, dict):
+                continue
+            ce = cloud.get(i)
+            ct = int(ce.get("t") or 0) if isinstance(ce, dict) else 0
+            cv = int(ce.get("v") or 0) if isinstance(ce, dict) else 0
+            bt = int(e.get("t") or 0)
+            bv = int(e.get("v") or 0)
+            if bt > ct or (bt == ct and bv != cv):
+                return True
+    cloud_a = adoc.get("answers") or {}
+    for i, r in (base_a.get("answers") or {}).items():
+        if not isinstance(r, dict):
+            continue
+        cr = cloud_a.get(i)
+        if not isinstance(cr, dict) or int(r.get("t") or 0) > int(cr.get("t") or 0):
+            return True
+    cloud_v = pdoc.get("views") or {}
+    for dev, m in (base_p.get("views") or {}).items():
+        cm = cloud_v.get(dev) or {}
+        for i, n in (m or {}).items():
+            if int(n or 0) > int(cm.get(i) or 0):
+                return True
+    cloud_d = pdoc.get("daily") or {}
+    for day, m in (base_p.get("daily") or {}).items():
+        cm = cloud_d.get(day) or {}
+        for i, v in (m or {}).items():
+            if v and not cm.get(i):
+                return True
+    return False
+
+
+def collect_mqtt():
+    """Retained-сообщения со всех публичных брокеров: куски дельт устройств."""
+    try:
+        import paho.mqtt.client as mqtt
+    except Exception as e:
+        print(f"  ! paho-mqtt нет: {str(e)[:80]}")
+        return []
+    try:
+        from paho.mqtt.enums import CallbackAPIVersion
+        def mk():
+            return mqtt.Client(CallbackAPIVersion.VERSION2,
+                               client_id="mlqbridge" + str(int(time.time() * 1000))[-9:])
+    except Exception:
+        def mk():
+            return mqtt.Client(client_id="mlqbridge" + str(int(time.time() * 1000))[-9:])
+    out = []
+    topic = NS + "/out/#"
+    for host, port, tls in MQTT_BROKERS:
+        got = []
+        def on_message(cl, userdata, msg, _got=got):
+            _got.append((msg.topic, bytes(msg.payload)))
+        c = None
+        try:
+            c = mk()
+            if tls:
+                c.tls_set()
+            c.on_message = on_message
+            c.connect(host, port, 8)
+            c.subscribe(topic, qos=1)
+            c.loop_start()
+            time.sleep(MQTT_WAIT)
+        except Exception as e:
+            print(f"  ! MQTT {host}:{port}: {str(e)[:90]}")
+        finally:
+            try:
+                if c is not None:
+                    c.loop_stop()
+                    c.disconnect()
+            except Exception:
+                pass
+        if got:
+            print(f"  MQTT {host}:{port}: {len(got)} сообщ.")
+        out.extend(got)
+    return out
+
+
+def dev_from_topic(topic):
+    prefix = NS + "/out/"
+    if not topic.startswith(prefix):
+        return ""
+    rest = topic[len(prefix):]
+    return rest.split("/")[0]
+
+
 def main(no_git: bool) -> int:
     global NS
+    out_path = None
+    reset = False
     for i, arg in enumerate(sys.argv):
         if arg == "--ns" and i + 1 < len(sys.argv):
             NS = sys.argv[i + 1]
+        if arg == "--out" and i + 1 < len(sys.argv):
+            out_path = Path(sys.argv[i + 1])
+        if arg == "--reset":
+            reset = True
     now = int(time.time() * 1000)
     print(f"[мост] запуск {now} ns={NS}")
 
+    snap_path = out_path or (BASE_DIR / "snapshot.json")
+    prev = None
+    if not reset:
+        try:
+            loaded = json.loads(snap_path.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict) and isinstance(loaded.get("p"), dict):
+                prev = loaded
+                print(f"[мост] накопительная база: savedAt {loaded.get('savedAt')}")
+        except Exception:
+            prev = None
+
+    if prev:
+        base_p = json.loads(json.dumps(prev.get("p") or {}))
+        base_a = json.loads(json.dumps(prev.get("a") or {}))
+    else:
+        base_p = {}
+        base_a = {}
+    base_p = norm_p(base_p)
+    base_a = norm_a(base_a)
+
+    changed = False
     pdoc = get_json(f"{MANTLE_BASE}/progress", key=MANTLE_KEY)
     adoc = get_json(f"{MANTLE_BASE}/answers", key=MANTLE_KEY)
-    if pdoc is None or adoc is None:
-        print("[мост] mantledb недоступен — выходим")
+    if pdoc is None and adoc is None and not prev:
+        print("[мост] mantledb недоступен и снимка нет — выходим")
         return 1
-    pdoc.setdefault("views", {})
-    pdoc.setdefault("favs", {})
-    pdoc.setdefault("done", {})
-    pdoc.setdefault("hidden", {})
-    pdoc.setdefault("daily", {})
-    adoc.setdefault("answers", {})
+    if pdoc is None:
+        print("[мост] mantledb progress недоступен — продолжаю по снимку")
+        pdoc = {}
+    if adoc is None:
+        print("[мост] mantledb answers недоступен — продолжаю по снимку")
+        adoc = {}
+    pdoc = norm_p(pdoc)
+    adoc = norm_a(adoc)
+    if merge_cloud_into(base_p, base_a, pdoc, adoc):
+        changed = True
+        print("[мост] облако → база: есть новые записи")
 
+    # textdb: реестр + все известные устройства (реестр, просмотры облака/снимка)
     reg_raw = textdb_get(f"{NS}-devices")
     devices = {}
     if reg_raw:
@@ -226,61 +463,53 @@ def main(no_git: bool) -> int:
             devices = {}
     devices = {k: v for k, v in devices.items()
                if isinstance(v, (int, float)) and now - int(v) < STALE_DEVICE_MS}
-    print(f"[мост] устройств в реестре: {len(devices)}")
+    candidates = set(devices.keys())
+    candidates |= set((base_p.get("views") or {}).keys())
+    candidates |= set((pdoc.get("views") or {}).keys())
+    candidates = {d for d in candidates
+                  if d and str(d).replace("-", "").replace("_", "").isalnum()}
+    print(f"[мост] textdb: реестр {len(devices)}, кандидатов {len(candidates)}")
+    if candidates:
+        with ThreadPoolExecutor(max_workers=6) as ex:
+            results = list(ex.map(read_textdb_device, sorted(candidates)))
+        for dev, ob in results:
+            if ob and apply_outbox(base_p, base_a, dev, ob):
+                changed = True
+                print(f"[мост] textdb {dev}: дельта слита")
 
-    for dev, last in sorted(devices.items()):
-        if not dev or not str(dev).replace('-', '').replace('_', '').isalnum():
-            continue
-        ob_raw = textdb_get(f"{NS}-out-{dev}")
-        if not ob_raw:
-            continue
+    # MQTT: retained-куски всех устройств; реестр не нужен (wildcard)
+    for topic, payload in collect_mqtt():
         try:
-            ob = json.loads(ob_raw)
+            piece = json.loads(payload.decode("utf-8", "replace"))
         except Exception:
-            print(f"[мост] {dev}: кривая дельта, пропускаю")
             continue
-        if not isinstance(ob, dict):
+        if not isinstance(piece, dict):
             continue
-        for kind in ("favs", "done", "hidden"):
-            if merge_flags(pdoc[kind], ob.get(kind)):
-                print(f"[мост] {dev}: флаги {kind}")
-        if isinstance(ob.get("views"), dict):
-            merge_views(pdoc["views"].setdefault(dev, {}), ob["views"])
-        if isinstance(ob.get("daily"), dict):
-            merge_daily(pdoc["daily"], ob["daily"])
-        try:
-            nparts = int(ob.get("aParts") or 0)
-        except Exception:
-            nparts = 0
-        for i in range(min(nparts, 40)):
-            part_raw = textdb_get(f"{NS}-outa-{dev}-{i}")
-            if not part_raw:
-                continue
-            try:
-                part = json.loads(part_raw)
-            except Exception:
-                continue
-            if not isinstance(part, list):
-                continue
-            recs = {}
-            for pair in part:
-                if isinstance(pair, list) and len(pair) == 2 and isinstance(pair[1], dict):
-                    recs[str(pair[0])] = pair[1]
-            if recs and merge_answers(adoc["answers"], recs):
-                print(f"[мост] {dev}: правки ответов, кусок {i}")
-        # ack не пишем: подтверждение после переноса в mantledb даёт браузер-«мост» (десктоп)
+        dev = str(piece.get("dev") or dev_from_topic(topic) or "")
+        if not dev:
+            continue
+        if apply_outbox(base_p, base_a, dev, piece):
+            changed = True
+            print(f"[мост] mqtt {dev}/{topic.rsplit('/', 1)[-1]}: дельта слита")
 
-    saved_at = max(int(pdoc.get("savedAt") or 0), int(adoc.get("savedAt") or 0)) or now
-    snap = {"schema": 3, "savedAt": saved_at, "p": pdoc, "a": adoc}
-    snap_path = BASE_DIR / "snapshot.json"
+    prev_saved = int(prev.get("savedAt") or 0) if prev else 0
+    cloud_saved = max(int(pdoc.get("savedAt") or 0), int(adoc.get("savedAt") or 0))
+    extra = snapshot_extra(base_p, base_a, pdoc, adoc)
+    if extra:
+        # в снимке есть дельты, которых ещё нет в облаке: он обязан быть новее
+        saved_at = max(now, prev_saved + 1, cloud_saved + 1)
+    else:
+        saved_at = max(prev_saved, cloud_saved)
+    snap = {"schema": 3, "savedAt": saved_at, "p": base_p, "a": base_a}
+    snap_path.parent.mkdir(parents=True, exist_ok=True)
     snap_path.write_text(json.dumps(snap, ensure_ascii=False), encoding="utf-8")
-    print(f"[мост] snapshot.json: {snap_path.stat().st_size} Б, savedAt {saved_at}")
+    print(f"[мост] snapshot: {snap_path} ({snap_path.stat().st_size} Б), savedAt {saved_at}, "
+          f"hidden {len(base_p['hidden'])}, answers {len(base_a['answers'])}")
 
-    if no_git:
-        print("[мост] --no-git: коммит не выполняется")
+    if no_git or out_path:
+        print("[мост] без коммита")
         return 0
 
-    import subprocess
     def git(*args):
         return subprocess.run(["git", "-C", str(BASE_DIR), *args],
                               capture_output=True, text=True)
@@ -295,9 +524,9 @@ def main(no_git: bool) -> int:
     if c.returncode != 0:
         print(f"[мост] commit failed: {c.stderr.strip()[:200]}")
         return 1
-    p = git("push", "origin", "main")
-    if p.returncode != 0:
-        print(f"[мост] push failed: {p.stderr.strip()[:200]}")
+    pushed = git("push", "origin", "main")
+    if pushed.returncode != 0:
+        print(f"[мост] push failed: {pushed.stderr.strip()[:200]}")
         return 1
     print("[мост] snapshot закоммичен и отправлен")
     return 0

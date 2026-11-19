@@ -1,7 +1,11 @@
 name: sync-bridge
 on:
   schedule:
-    - cron: "*/30 * * * *"
+    - cron: "*/10 * * * *"
+  push:
+    branches: [main]
+    paths-ignore:
+      - "snapshot.json"
   workflow_dispatch:
 
 permissions:
@@ -21,7 +25,10 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: мост синка (дельты устройств → mantledb → snapshot.json)
+      - name: зависимости
+        run: pip install paho-mqtt
+
+      - name: мост синка (дельты устройств → snapshot.json)
         run: python bridge/bridge.py
 
       - name: коммит snapshot.json
