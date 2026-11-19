@@ -251,10 +251,24 @@ def merge_cloud_into(base_p, base_a, pdoc, adoc):
 
 
 def apply_outbox(pdoc, adoc, dev, ob):
-    """Дельта устройства (textdb-документ) → документы снимка."""
+    """Дельта устройства (textdb) или полное MQTT-состояние → документы снимка."""
     if not isinstance(ob, dict):
         return False
     changed = False
+    if isinstance(ob.get("p"), dict):
+        p = ob["p"]
+        for kind in ("favs", "done", "hidden"):
+            if merge_flags(pdoc[kind], p.get(kind)):
+                changed = True
+        for d2, m in (p.get("views") or {}).items():
+            if isinstance(m, dict) and merge_views(pdoc["views"].setdefault(d2, {}), m):
+                changed = True
+        if merge_daily(pdoc["daily"], p.get("daily")):
+            changed = True
+        a = ob.get("a") if isinstance(ob.get("a"), dict) else {}
+        if isinstance(a.get("answers"), dict) and merge_answers(adoc["answers"], a["answers"]):
+            changed = True
+        return changed
     for kind in ("favs", "done", "hidden"):
         if merge_flags(pdoc[kind], ob.get(kind)):
             changed = True
@@ -361,7 +375,7 @@ def collect_mqtt():
         def mk():
             return mqtt.Client(client_id="mlqbridge" + str(int(time.time() * 1000))[-9:])
     out = []
-    topic = NS + "/out/#"
+    topics = [NS + "/out/#"]
     for host, port, tls in MQTT_BROKERS:
         got = []
         def on_message(cl, userdata, msg, _got=got):
@@ -373,7 +387,8 @@ def collect_mqtt():
                 c.tls_set()
             c.on_message = on_message
             c.connect(host, port, 8)
-            c.subscribe(topic, qos=1)
+            for topic in topics:
+                c.subscribe(topic, qos=1)
             c.loop_start()
             time.sleep(MQTT_WAIT)
         except Exception as e:
