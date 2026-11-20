@@ -3807,6 +3807,12 @@ if (qHash){ bumpView(qHash.id); state.from='list'; state.cur=qHash; state.view='
 else setView(savedMode);
 
 setGhIcon();
+if (!ghToken() && !store.get('qa.ghHint', false)){
+  setTimeout(function(){
+    toast('Нажми 🔑 вверху, чтобы подключить синхронизацию');
+    store.set('qa.ghHint', true);
+  }, 1600);
+}
 var syncBtn = document.getElementById('sync');
 if (syncBtn) syncBtn.addEventListener('click', function(){
   if (!ghToken()){ openGhModal(); return; }
